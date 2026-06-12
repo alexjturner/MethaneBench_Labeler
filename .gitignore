@@ -19,6 +19,9 @@ __pycache__/
 # Log
 app.log
 
+# Upload script
+upload_git_data.csh
+
 # pixi environment (large; reproducible from pixi.toml + pixi.lock)
 .pixi/
 
