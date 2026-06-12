@@ -16,6 +16,9 @@ __pycache__/
 *.pyo
 .env
 
+# Log
+app.log
+
 # pixi environment (large; reproducible from pixi.toml + pixi.lock)
 .pixi/
 
