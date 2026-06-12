@@ -28,6 +28,7 @@ from matplotlib.colors import LinearSegmentedColormap
 _NDVI_CMAP  = LinearSegmentedColormap.from_list('ndvi_tg',  ['#e0e0e0', '#1a7a1a'])  # tan → forest green
 _CLOUD_CMAP = LinearSegmentedColormap.from_list('cloud_wg', ['#1c1c1e', '#e0e0e0'])  # dark → light grey
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -472,4 +473,9 @@ async def export_labels():
 
 # Static files — must be mounted last
 _static_dir = Path(__file__).parent / "static"
-app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="static")
+
+@app.get("/", include_in_schema=False)
+async def index():
+    return FileResponse(_static_dir / "index.html")
+
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
