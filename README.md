@@ -134,6 +134,10 @@ uvicorn app:app --root-path /labeler --host 0.0.0.0 --port 8000
 
 `labels.db` is created automatically on first startup — no setup required. It is excluded from version control (`.gitignore`) since it contains user data. Back it up separately in production.
 
+## Contact
+
+[Alex Turner](https://alexjturner.github.io/) — University of Washington
+
 ## License
 
 See [LICENSE](LICENSE).
