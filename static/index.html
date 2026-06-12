@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="logo.ico">
+<title>BENCH₄ — Methane Plume Labeler</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #1c1c1e;
+  --panel:   #2c2c2e;
+  --border:  #3a3a3c;
+  --accent:  #0a84ff;
+  --success: #30d158;
+  --warning: #ff9f0a;
+  --danger:  #ff453a;
+  --text:    #f2f2f7;
+  --muted:   #8e8e93;
+  --cal:     #bf5af2;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Welcome ──────────────────────────────────────────────────────────── */
+#welcome {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.welcome-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 40px;
+  max-width: 520px;
+  width: 100%;
+}
+.welcome-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.welcome-logo img {
+  height: 48px;
+  width: auto;
+}
+.welcome-logo .wl-text h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+.welcome-logo .wl-text p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.welcome-card > p.desc {
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 24px;
+  font-size: 13px;
+}
+label.field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.field-group { margin-bottom: 18px; }
+input[type="text"], input[type="email"] {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus { border-color: var(--accent); }
+
+.expertise-options { display: flex; flex-direction: column; gap: 7px; }
+.expertise-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.expertise-option:hover { border-color: var(--muted); }
+.expertise-option.selected { border-color: var(--accent); }
+.expertise-option input[type="radio"] { margin-top: 3px; flex-shrink: 0; accent-color: var(--accent); }
+.expertise-option .opt-title { font-weight: 600; font-size: 13px; }
+.expertise-option .opt-desc  { color: var(--muted); font-size: 12px; margin-top: 1px; line-height: 1.4; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn:active   { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary  { background: var(--accent);  color: #fff; }
+.btn-success  { background: var(--success); color: #fff; }
+.btn-ghost    { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-full     { width: 100%; padding: 11px; }
+.btn-sm       { padding: 6px 12px; font-size: 12px; }
+.error-msg    { color: var(--danger); font-size: 12px; margin-top: 6px; }
+
+/* ── App shell ────────────────────────────────────────────────────────── */
+#app { display: none; flex-direction: column; flex: 1; min-height: 100vh; }
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.header-logo {
+  height: 34px;
+  width: auto;
+  flex-shrink: 0;
+}
+.header-brand { line-height: 1.2; }
+.header-brand .brand-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+.header-brand .brand-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+.header-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.header-spacer { flex: 1; }
+.header-stat {
+  font-size: 12px;
+  color: var(--muted);
+}
+.header-stat strong { color: var(--text); }
+.user-badge {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.user-badge span { color: var(--text); font-weight: 600; }
+
+/* ── Main layout ──────────────────────────────────────────────────────── */
+main {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  align-items: flex-start;
+}
+
+/* ── Image panel ──────────────────────────────────────────────────────── */
+.image-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.scene-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.scene-date  { font-weight: 600; font-size: 13px; }
+.scene-instr { color: var(--muted); font-size: 12px; }
+.scene-loc   { color: var(--muted); font-size: 11px; font-family: monospace; }
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.badge-cal  { background: #3d2060; color: var(--cal); }
+.badge-rand { background: #1a3a1a; color: var(--success); }
+
+/* Main image + thumb strip */
+.image-area {
+  display: flex;
+  gap: 0;
+}
+.canvas-wrapper {
+  position: relative;
+  cursor: crosshair;
+  line-height: 0;
+  flex-shrink: 0;
+}
+#canvas { display: block; }
+
+.canvas-overlay-msg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(28,28,30,0.80);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  text-align: center;
+  padding: 16px;
+}
+.canvas-overlay-msg.visible { opacity: 1; }
+
+/* Thumbnail strip — height is set by JS to match the canvas exactly */
+.thumb-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+.thumb-item {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+  flex: 1;           /* fill equal share of strip height */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 88px;
+}
+.thumb-item:hover   { border-color: var(--muted); }
+.thumb-item.active  { border-color: var(--accent); }
+.thumb-img {
+  display: block;
+  flex: 1;           /* fill item height minus label */
+  min-height: 0;
+  width: 100%;
+  object-fit: fill;
+  image-rendering: pixelated;
+}
+.thumb-label {
+  display: block;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 2px 0 3px;
+  background: var(--panel);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  height: 18px;
+}
+.thumb-item.active .thumb-label { color: var(--accent); }
+
+/* View hint bar below image */
+.view-hint-bar {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 5px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  min-height: 24px;
+  line-height: 1.4;
+}
+
+/* ── Location map ─────────────────────────────────────────────────────── */
+#location-map {
+  width: 100%;
+  height: 128px;
+  border-radius: 7px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+/* Star marker */
+.map-star {
+  color: #ff453a;
+  font-size: 18px;
+  line-height: 1;
+  text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
+  pointer-events: none;   /* let map click handler fire */
+}
+
+/* ── Controls panel ───────────────────────────────────────────────────── */
+.controls-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  min-width: 220px;
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.instructions {
+  background: var(--bg);
+  border-radius: 7px;
+  padding: 10px 11px;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.instructions li   { margin-left: 13px; margin-bottom: 3px; }
+.instructions .key {
+  display: inline-block;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-family: monospace;
+  font-size: 10px;
+  color: var(--text);
+}
+
+.polygon-list { display: flex; flex-direction: column; gap: 5px; min-height: 24px; }
+.polygon-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+.poly-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.poly-label  { flex: 1; color: var(--muted); }
+.poly-del    { cursor: pointer; color: var(--danger); font-size: 15px; line-height: 1; opacity: 0.7; }
+.poly-del:hover { opacity: 1; }
+.empty-poly  { color: var(--muted); font-size: 12px; font-style: italic; }
+
+.submit-section { display: flex; flex-direction: column; gap: 7px; margin-top: auto; }
+
+.no-plume-btn {
+  width: 100%;
+  padding: 9px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 2px solid var(--warning);
+  background: transparent;
+  color: var(--warning);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.no-plume-btn.active        { background: var(--warning); color: #fff; }
+.no-plume-btn:hover         { background: rgba(255,159,10,0.15); }
+.no-plume-btn.active:hover  { background: var(--warning); }
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 9px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--text); text-decoration: underline; }
+footer .footer-sep { color: var(--border); }
+
+/* ── Loading overlay ──────────────────────────────────────────────────── */
+#loading {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(28,28,30,0.85);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+}
+#loading.visible { display: flex; }
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { color: var(--muted); font-size: 13px; }
+
+/* ── Colormap range slider ────────────────────────────────────────────── */
+.colorbar-control {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 98px;
+  gap: 2px;
+  user-select: none;
+}
+.colorbar-control.cb-disabled {
+  opacity: 0.22;
+  pointer-events: none;
+}
+.colorbar-label-text {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1;
+}
+.cb-vals-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text);
+  line-height: 1.1;
+}
+/* Track + hanging triangle thumbs */
+.range-wrap {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  overflow: visible;
+  flex-shrink: 0;
+}
+.range-track-bg {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--border);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.range-track-fill {
+  position: absolute;
+  top: 5px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  left: 0;
+  width: 100%;
+}
+.range-wrap input[type="range"] {
+  position: absolute;
+  width: 100%;
+  top: 0;
+  height: 14px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+}
+.range-wrap input[type="range"]:focus { outline: none; }
+.range-wrap input[type="range"]::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 3px;
+}
+.range-wrap input[type="range"]::-moz-range-track {
+  background: transparent;
+  height: 3px;
+  border: none;
+}
+/* Downward-pointing triangle thumbs — flat top on track, point below */
+.range-wrap input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  background: var(--accent);
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+  cursor: pointer;
+  pointer-events: all;
+  margin-top: 6px;
+  border: none;
+  border-radius: 0;
+}
+.range-wrap input[type="range"]::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  background: var(--accent);
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+  cursor: pointer;
+  pointer-events: all;
+  border: none;
+  border-radius: 0;
+}
+
+/* ── Done screen ──────────────────────────────────────────────────────── */
+#done {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.done-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 48px 40px;
+  max-width: 420px;
+  text-align: center;
+}
+.done-card .done-icon { font-size: 44px; margin-bottom: 14px; }
+.done-card h2 { font-size: 20px; margin-bottom: 8px; }
+.done-card p  { color: var(--muted); line-height: 1.55; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ── Welcome ─────────────────────────────────────────────────────────── -->
+<div id="welcome">
+  <div class="welcome-card">
+    <div class="welcome-logo">
+      <a href="https://fetch4.github.io" target="_blank">
+         <img src="fetch4_logo.png"
+              onerror="this.style.display='none'" alt="FETCH4">
+      </a>
+      <div class="wl-text">
+        <h1>BENCH<sub>4</sub></h1>
+        <p>Methane Plume Benchmark Dataset · <a href="https://fetch4.github.io" target="_blank" style="color:var(--muted)">FETCH<sub>4</sub> Project</a></p>
+      </div>
+    </div>
+    <p class="desc">
+      Help train methane detection models by labeling satellite imagery.
+      Draw polygons around methane plumes — or mark scenes with no visible plume.
+      Your labels are anonymous and used only for scientific research.
+    </p>
+
+    <div class="field-group">
+      <label class="field-label" for="username">Username</label>
+      <input type="text" id="username" placeholder="Choose a username" autocomplete="off" />
+      <div class="error-msg" id="username-err" style="display:none"></div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Your background</label>
+      <div class="expertise-options">
+        <label class="expertise-option" onclick="selectExpertise(1)">
+          <input type="radio" name="expertise" value="1" />
+          <div>
+            <div class="opt-title">Methane plume researcher</div>
+            <div class="opt-desc">I work directly on satellite-based methane detection or quantification.</div>
+          </div>
+        </label>
+        <label class="expertise-option" onclick="selectExpertise(2)">
+          <input type="radio" name="expertise" value="2" />
+          <div>
+            <div class="opt-title">Greenhouse gas scientist</div>
+            <div class="opt-desc">I work on GHG emissions but not specifically satellite methane detection.</div>
+          </div>
+        </label>
+        <label class="expertise-option" onclick="selectExpertise(3)">
+          <input type="radio" name="expertise" value="3" />
+          <div>
+            <div class="opt-title">Other</div>
+            <div class="opt-desc">I have a scientific background but not specifically in this area.</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="email">
+        Email
+        <span style="font-weight:400;text-transform:none;letter-spacing:0">
+          (optional — if you'd like to be contacted about the dataset)
+        </span>
+      </label>
+      <input type="email" id="email" placeholder="you@example.com" />
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="startLabeling()">Start labeling →</button>
+    <div class="error-msg" id="login-err" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ── App ─────────────────────────────────────────────────────────────── -->
+<div id="app">
+  <header>
+    <a href="https://fetch4.github.io" target="_blank">
+      <img class="header-logo"
+           src="fetch4_logo.png"
+           onerror="this.style.display='none'" alt="FETCH4">
+    </a>
+    <div class="header-brand">
+      <div class="brand-name">BENCH<sub>4</sub></div>
+      <div class="brand-sub">Methane Plume Benchmark Dataset</div>
+    </div>
+    <div class="header-divider"></div>
+    <div class="header-spacer"></div>
+    <div class="header-stat">Labeled: <strong id="hdr-count">0</strong></div>
+    <div class="header-stat">Scenes: <strong id="hdr-total">—</strong></div>
+    <div class="user-badge">Logged in as <span id="hdr-user"></span></div>
+  </header>
+
+  <main>
+    <!-- Left: image panel -->
+    <div class="image-panel">
+      <div class="scene-meta">
+        <span class="scene-date"  id="scene-date">—</span>
+        <span class="scene-instr" id="scene-instr">—</span>
+        <span class="scene-loc"   id="scene-loc">—</span>
+        <span class="badge"       id="scene-badge"></span>
+        <!-- Colormap range slider (grayed out for RGB) -->
+        <div class="colorbar-control cb-disabled" id="colorbar-control">
+          <span class="colorbar-label-text">Range</span>
+          <div class="cb-vals-row">
+            <span id="cb-vmin-val">—</span>
+            <span id="cb-vmax-val">—</span>
+          </div>
+          <div class="range-wrap" id="range-wrap">
+            <div class="range-track-bg"></div>
+            <div class="range-track-fill" id="range-track-fill"></div>
+            <input type="range" id="cb-slider-a" oninput="onColorbarChange()">
+            <input type="range" id="cb-slider-b" oninput="onColorbarChange()">
+          </div>
+        </div>
+      </div>
+
+      <div class="image-area">
+        <!-- Main drawing canvas -->
+        <div class="canvas-wrapper" id="canvas-wrapper">
+          <canvas id="canvas"></canvas>
+          <div class="canvas-overlay-msg" id="canvas-msg"></div>
+        </div>
+
+        <!-- Thumbnail strip (6 views, no polygon overlay) -->
+        <div class="thumb-strip" id="thumb-strip">
+          <div class="thumb-item active" data-view="rgb"    onclick="switchView('rgb')">
+            <img class="thumb-img" id="thumb-rgb" alt="RGB">
+            <span class="thumb-label">RGB</span>
+          </div>
+          <div class="thumb-item" data-view="zscore" onclick="switchView('zscore')">
+            <img class="thumb-img" id="thumb-zscore" alt="Methane">
+            <span class="thumb-label">Methane</span>
+          </div>
+          <div class="thumb-item" data-view="dr"     onclick="switchView('dr')">
+            <img class="thumb-img" id="thumb-dr" alt="dR">
+            <span class="thumb-label">dR</span>
+          </div>
+          <div class="thumb-item" data-view="ndvi"   onclick="switchView('ndvi')">
+            <img class="thumb-img" id="thumb-ndvi" alt="NDVI">
+            <span class="thumb-label">NDVI</span>
+          </div>
+          <div class="thumb-item" data-view="cloud"  onclick="switchView('cloud')">
+            <img class="thumb-img" id="thumb-cloud" alt="Cloud">
+            <span class="thumb-label">Cloud</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="view-hint-bar" id="view-hint">True-colour composite (Red / Green / Blue)</div>
+    </div>
+
+    <!-- Right: controls -->
+    <div class="controls-panel">
+
+      <div>
+        <div class="section-title">Location</div>
+        <div id="location-map"></div>
+      </div>
+
+      <div>
+        <div class="section-title">How to label</div>
+        <div class="instructions">
+          <ul>
+            <li><strong>Click</strong> to place polygon vertices</li>
+            <li><strong>Double-click</strong> or click the first vertex ●&nbsp;to close</li>
+            <li>Draw <strong>multiple polygons</strong> for multiple plumes</li>
+            <li>Click a thumbnail to switch the active view</li>
+            <li><span class="key">Esc</span> cancels the polygon in progress</li>
+          </ul>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">Polygons drawn <span id="poly-count">(0)</span></div>
+        <div class="polygon-list" id="polygon-list">
+          <div class="empty-poly" id="empty-poly-msg">No polygons drawn yet.</div>
+        </div>
+        <button class="btn btn-ghost btn-sm"
+                style="margin-top:8px;width:100%"
+                onclick="undoLast()" id="btn-undo" disabled>
+          ↩ Undo last polygon
+        </button>
+      </div>
+
+      <div class="submit-section">
+        <button class="no-plume-btn" id="no-plume-btn" onclick="toggleNoPlume()">
+          ✕&nbsp; No plume visible
+        </button>
+        <button class="btn btn-success btn-full" onclick="submitLabel()" id="btn-submit">
+          Submit →
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <a href="https://fetch4.github.io" target="_blank"><img src="fetch4_logo.png" onerror="this.style.display='none'" style="height:32px;width:auto;opacity:0.6" alt="FETCH4"></a>
+    <span><a href="https://fetch4.github.io" target="_blank">Part of the FETCH<sub>4</sub> project</a> <span class="footer-sep">·</span> <a href="/api/export/labels" target="_blank">Export labels (JSON)</a></span>
+  </footer>
+</div>
+
+<!-- ── Done ────────────────────────────────────────────────────────────── -->
+<div id="done" style="flex-direction:column">
+  <div class="done-card">
+    <div class="done-icon">🎉</div>
+    <h2>All done — thank you!</h2>
+    <p id="done-msg">You've labeled all available scenes. Your contributions will help train better methane detection models.</p>
+  </div>
+</div>
+
+<!-- ── Loading ──────────────────────────────────────────────────────────── -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Loading scene…</div>
+</div>
+
+<script>
+// ── Constants ───────────────────────────────────────────────────────────
+const VIEWS = ['rgb', 'zscore', 'dr', 'ndvi', 'cloud'];
+const VIEW_HINTS = {
+  rgb:    'True-colour composite (Red / Green / Blue)',
+  zscore: 'Methane proxy: dR vs. same-year background — red = anomalously high SWIR absorption, likely methane plume',
+  dr:     'dR = (SWIR1−SWIR2)/(SWIR1+SWIR2) — raw methane proxy; red = positive dR (potential absorption)',
+  ndvi:   'NDVI = (NIR−Red)/(NIR+Red) — vegetation index (tan = bare soil, green = vegetation)',
+  cloud:  'Approximate cloud likelihood (visible-band brightness) — light grey regions are likely cloudy',
+};
+const POLY_COLORS  = ['#ff453a','#30d158','#0a84ff','#ff9f0a','#bf5af2','#5ac8fa','#ff6b81','#4cd964'];
+const CLOSE_RADIUS = 12;
+
+// ── State ───────────────────────────────────────────────────────────────
+let userId         = null;
+let currentScene   = null;
+let activeView     = 'rgb';
+let imageCache     = {};     // view → HTMLImageElement
+let completedPolys = [];     // [[{x,y},...], ...]  display coords
+let currentPoly    = [];
+let mousePos       = {x: 0, y: 0};
+let noPlume        = false;
+let labelCount     = 0;
+
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+
+// ── Welcome / login ─────────────────────────────────────────────────────
+let selectedExpertise = null;
+
+function selectExpertise(val) {
+  selectedExpertise = val;
+  document.querySelectorAll('.expertise-option').forEach((el, i) => {
+    el.classList.toggle('selected', i + 1 === val);
+  });
+}
+
+async function startLabeling() {
+  const username = document.getElementById('username').value.trim();
+  const email    = document.getElementById('email').value.trim();
+  const errEl    = document.getElementById('login-err');
+  const unErr    = document.getElementById('username-err');
+  errEl.style.display = unErr.style.display = 'none';
+
+  if (!username) {
+    unErr.textContent = 'Please enter a username.';
+    unErr.style.display = 'block';
+    return;
+  }
+  if (!selectedExpertise) {
+    errEl.textContent = 'Please select your background.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  showLoading('Logging in…');
+  try {
+    const res  = await fetch('/api/user/login', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({username, expertise: selectedExpertise, email: email || null}),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    userId     = data.user_id;
+    labelCount = data.labels_completed;
+
+    document.getElementById('hdr-user').textContent  = userId;
+    document.getElementById('hdr-count').textContent = labelCount;
+
+    const stats = await fetch('/api/stats').then(r => r.json());
+    document.getElementById('hdr-total').textContent = stats.total_scenes;
+
+    document.getElementById('welcome').style.display = 'none';
+    document.getElementById('app').style.display     = 'flex';
+    initMap();
+    await loadNextScene();
+  } catch (e) {
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    hideLoading();
+  }
+}
+document.getElementById('username').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startLabeling();
+});
+
+// ── Scene loading ───────────────────────────────────────────────────────
+async function loadNextScene() {
+  showLoading('Loading next scene…');
+  resetDrawingState();
+  try {
+    const res  = await fetch(`/api/scene/next?user_id=${encodeURIComponent(userId)}`);
+    const data = await res.json();
+
+    if (data.done) { showDone(data.message); return; }
+
+    currentScene = data;
+    imageCache   = {};
+    initColorbar(data.view_ranges || {});
+
+    // Pre-load all view images
+    for (const [view, src] of Object.entries(data.images)) {
+      const img = new Image();
+      img.src   = src;
+      await new Promise(r => { img.onload = r; img.onerror = r; });
+      imageCache[view] = img;
+    }
+
+    canvas.width  = data.img_width;
+    canvas.height = data.img_height;
+    // Lock thumb strip to canvas height so they align exactly
+    document.getElementById('thumb-strip').style.height = data.img_height + 'px';
+
+    // Update scene metadata
+    document.getElementById('scene-date').textContent  = data.date;
+    document.getElementById('scene-instr').textContent = formatInstr(data.instrument);
+    document.getElementById('scene-loc').textContent   =
+      `${data.clat.toFixed(4)}°N, ${data.clon.toFixed(4)}°E`;
+    const badge = document.getElementById('scene-badge');
+    if (data.is_calibration) {
+      badge.textContent = '★ Calibration'; badge.className = 'badge badge-cal';
+    } else {
+      badge.textContent = 'Random';        badge.className = 'badge badge-rand';
+    }
+
+    updateThumbnails();
+    switchView(activeView);
+    updateMap(data.clat, data.clon);
+  } catch (e) {
+    alert('Failed to load scene: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+function formatInstr(key) {
+  return {landsat_45:'Landsat 4/5', landsat_89:'Landsat 8/9', sentinel2:'Sentinel-2'}[key] || key;
+}
+
+// ── Thumbnails ──────────────────────────────────────────────────────────
+function updateThumbnails() {
+  VIEWS.forEach(view => {
+    const img = document.getElementById(`thumb-${view}`);
+    if (img && imageCache[view]) img.src = imageCache[view].src;
+    const item = document.querySelector(`.thumb-item[data-view="${view}"]`);
+    if (item) item.classList.toggle('active', view === activeView);
+  });
+}
+
+// ── View switching ──────────────────────────────────────────────────────
+function switchView(view) {
+  if (!imageCache[view]) return;
+  activeView = view;
+  document.getElementById('view-hint').textContent = VIEW_HINTS[view] || '';
+  updateThumbnails();
+  updateColorbarForView(view);
+  redraw();
+}
+
+// ── Canvas drawing ──────────────────────────────────────────────────────
+function redraw() {
+  if (!imageCache[activeView]) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(imageCache[activeView], 0, 0);
+
+  // Completed polygons
+  completedPolys.forEach((poly, i) => {
+    const color = POLY_COLORS[i % POLY_COLORS.length];
+    ctx.beginPath();
+    ctx.moveTo(poly[0].x, poly[0].y);
+    poly.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.closePath();
+    ctx.fillStyle   = color + '40';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 2;
+    ctx.setLineDash([]);
+    ctx.stroke();
+    poly.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  });
+
+  // In-progress polygon
+  if (currentPoly.length > 0) {
+    ctx.beginPath();
+    ctx.moveTo(currentPoly[0].x, currentPoly[0].y);
+    currentPoly.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(mousePos.x, mousePos.y);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    currentPoly.forEach((p, i) => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, i === 0 ? 6 : 4, 0, Math.PI * 2);
+      ctx.fillStyle   = i === 0 ? '#ffff00' : '#ffffff';
+      ctx.strokeStyle = '#00000088';
+      ctx.lineWidth   = 1;
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    // Snap indicator near first vertex
+    if (currentPoly.length >= 3 && dist(mousePos, currentPoly[0]) < CLOSE_RADIUS) {
+      ctx.beginPath();
+      ctx.arc(currentPoly[0].x, currentPoly[0].y, CLOSE_RADIUS, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth   = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+function canvasPoint(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {x: e.clientX - rect.left, y: e.clientY - rect.top};
+}
+
+canvas.addEventListener('mousemove', e => {
+  mousePos = canvasPoint(e);
+  if (currentPoly.length > 0) redraw();
+});
+
+canvas.addEventListener('click', e => {
+  if (!currentScene) return;
+  const pt = canvasPoint(e);
+  if (currentPoly.length >= 3 && dist(pt, currentPoly[0]) < CLOSE_RADIUS) {
+    closePoly(); return;
+  }
+  currentPoly.push(pt);
+  noPlume = false;
+  updateNoPlumeBtn();
+  redraw();
+});
+
+canvas.addEventListener('dblclick', e => {
+  if (currentPoly.length >= 4) {
+    currentPoly.pop();   // remove extra vertex from second click
+    closePoly();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { currentPoly = []; redraw(); }
+});
+
+function closePoly() {
+  if (currentPoly.length < 3) { currentPoly = []; redraw(); return; }
+  completedPolys.push([...currentPoly]);
+  currentPoly = [];
+  updatePolyList();
+  redraw();
+}
+
+function undoLast() {
+  if (currentPoly.length > 0) { currentPoly = []; }
+  else                         { completedPolys.pop(); }
+  updatePolyList();
+  redraw();
+}
+
+function deletePolygon(idx) {
+  completedPolys.splice(idx, 1);
+  updatePolyList();
+  redraw();
+}
+
+function updatePolyList() {
+  const list    = document.getElementById('polygon-list');
+  const empty   = document.getElementById('empty-poly-msg');
+  const undoBtn = document.getElementById('btn-undo');
+  document.getElementById('poly-count').textContent = `(${completedPolys.length})`;
+  undoBtn.disabled = completedPolys.length === 0 && currentPoly.length === 0;
+
+  Array.from(list.children).forEach(c => { if (c !== empty) c.remove(); });
+
+  if (completedPolys.length === 0) {
+    empty.style.display = '';
+  } else {
+    empty.style.display = 'none';
+    completedPolys.forEach((poly, i) => {
+      const color = POLY_COLORS[i % POLY_COLORS.length];
+      const item  = document.createElement('div');
+      item.className = 'polygon-item';
+      item.innerHTML = `
+        <div class="poly-swatch" style="background:${color}"></div>
+        <span class="poly-label">Polygon ${i + 1} (${poly.length} pts)</span>
+        <span class="poly-del" onclick="deletePolygon(${i})" title="Delete">×</span>`;
+      list.appendChild(item);
+    });
+  }
+}
+
+// ── No-plume toggle ─────────────────────────────────────────────────────
+function toggleNoPlume() {
+  noPlume = !noPlume;
+  if (noPlume) { completedPolys = []; currentPoly = []; updatePolyList(); redraw(); }
+  updateNoPlumeBtn();
+}
+function updateNoPlumeBtn() {
+  const btn = document.getElementById('no-plume-btn');
+  btn.classList.toggle('active', noPlume);
+  btn.textContent = noPlume ? '✓  No plume (selected)' : '✕  No plume visible';
+}
+
+// ── Submit ──────────────────────────────────────────────────────────────
+async function submitLabel() {
+  if (!currentScene) return;
+  if (!noPlume && completedPolys.length === 0) {
+    showCanvasMsg('Draw at least one polygon,\nor click "No plume visible"');
+    return;
+  }
+  const scale    = currentScene.orig_width ? canvas.width / currentScene.orig_width : 4;
+  const polysOrig = completedPolys.map(poly => poly.map(p => [p.x / scale, p.y / scale]));
+
+  showLoading('Saving label…');
+  try {
+    const res = await fetch('/api/label', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({
+        user_id:  userId,
+        scene_id: currentScene.scene_id,
+        polygons: polysOrig,
+        no_plume: noPlume,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    labelCount  = data.labels_completed;
+    document.getElementById('hdr-count').textContent = labelCount;
+    await loadNextScene();
+  } catch (e) {
+    alert('Submit failed: ' + e.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ── Location map ────────────────────────────────────────────────────────
+let locMap    = null;
+let locMarker = null;
+
+function initMap() {
+  if (locMap) return;
+  locMap = L.map('location-map', {
+    zoomControl:       false,
+    attributionControl: false,
+    scrollWheelZoom:   false,
+    dragging:          false,
+    touchZoom:         false,
+    doubleClickZoom:   false,
+    boxZoom:           false,
+    keyboard:          false,
+  }).setView([20, 15], 1);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(locMap);
+
+  // Clicking anywhere on the map opens Google Maps at the current scene coords
+  locMap.on('click', () => {
+    if (!currentScene) return;
+    const { clat, clon } = currentScene;
+    window.open(`https://maps.google.com/maps?q=${clat},${clon}&ll=${clat},${clon}&z=12`, '_blank');
+  });
+  document.getElementById('location-map').style.cursor = 'pointer';
+}
+
+function updateMap(clat, clon) {
+  if (!locMap) return;
+  if (locMarker) { locMap.removeLayer(locMarker); locMarker = null; }
+
+  const starIcon = L.divIcon({
+    html:       '<span class="map-star">★</span>',
+    className:  '',
+    iconSize:   [18, 18],
+    iconAnchor: [9, 9],
+  });
+
+  locMarker = L.marker([clat, clon], { icon: starIcon, interactive: false })
+    .addTo(locMap);
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+function resetDrawingState() {
+  completedPolys = []; currentPoly = []; noPlume = false;
+  updatePolyList(); updateNoPlumeBtn();
+}
+
+function showLoading(msg) {
+  document.getElementById('loading-text').textContent = msg || 'Loading…';
+  document.getElementById('loading').classList.add('visible');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.remove('visible');
+}
+
+let canvasMsgTimer;
+function showCanvasMsg(text) {
+  const el = document.getElementById('canvas-msg');
+  el.textContent = text;
+  el.classList.add('visible');
+  clearTimeout(canvasMsgTimer);
+  canvasMsgTimer = setTimeout(() => el.classList.remove('visible'), 2500);
+}
+
+function showDone(msg) {
+  document.getElementById('app').style.display  = 'none';
+  document.getElementById('done').style.display = 'flex';
+  if (msg) document.getElementById('done-msg').textContent = msg;
+}
+
+// ── Colormap range slider ────────────────────────────────────────────────
+// Hard limits per view — slider cannot exceed these bounds
+const VIEW_SLIDER_EXTENTS = {
+  ndvi:   { min:  0.0, max: 1.0 },   // physically bounded [0,1]
+  cloud:  { min:  0.0, max: 1.0 },   // physically bounded [0,1]
+  zscore:                    null,   // adaptive: default ± 1× span
+  dr:                        null,   // adaptive: default ± 1× span
+};
+
+let defaultRanges = {};   // view → {vmin, vmax}  (from server, reset each scene)
+let currentRanges = {};   // view → {vmin, vmax}  (user adjustments, cleared each scene)
+
+const cbControl  = document.getElementById('colorbar-control');
+const cbSliderA  = document.getElementById('cb-slider-a');
+const cbSliderB  = document.getElementById('cb-slider-b');
+const cbVminVal  = document.getElementById('cb-vmin-val');
+const cbVmaxVal  = document.getElementById('cb-vmax-val');
+const cbFill     = document.getElementById('range-track-fill');
+
+function initColorbar(viewRanges) {
+  defaultRanges = viewRanges;
+  currentRanges = {};
+}
+
+function _cbExtent(view, def) {
+  const fixed = VIEW_SLIDER_EXTENTS[view];
+  if (fixed) return { min: fixed.min, max: fixed.max, step: (fixed.max - fixed.min) / 200 };
+  const span = def.vmax - def.vmin;
+  const s    = span > 0 ? span : Math.abs(def.vmin) || 1.0;
+  return { min: def.vmin - 1 * s, max: def.vmax + 1 * s, step: (5 * s) / 200 };
+}
+
+function _fmtCbVal(v) { return v.toFixed(2); }
+
+function updateColorbarForView(view) {
+  if (view === 'rgb') {
+    cbControl.classList.add('cb-disabled');
+    return;
+  }
+  const def = defaultRanges[view];
+  if (!def) { cbControl.classList.add('cb-disabled'); return; }
+
+  const ext = _cbExtent(view, def);
+  cbSliderA.min = cbSliderB.min = ext.min;
+  cbSliderA.max = cbSliderB.max = ext.max;
+  cbSliderA.step = cbSliderB.step = ext.step > 0 ? ext.step : 0.001;
+
+  // Restore user-adjusted values if present, otherwise use defaults
+  const cur = currentRanges[view] || def;
+  cbSliderA.value = cur.vmin;
+  cbSliderB.value = cur.vmax;
+
+  _updateCbDisplay();
+  cbControl.classList.remove('cb-disabled');
+}
+
+function _updateCbDisplay() {
+  const v1   = parseFloat(cbSliderA.value);
+  const v2   = parseFloat(cbSliderB.value);
+  const vmin = Math.min(v1, v2);
+  const vmax = Math.max(v1, v2);
+  cbVminVal.textContent = _fmtCbVal(vmin);
+  cbVmaxVal.textContent = _fmtCbVal(vmax);
+
+  // Highlight the filled track between the two handles
+  const totalRange = parseFloat(cbSliderA.max) - parseFloat(cbSliderA.min);
+  if (totalRange > 0) {
+    const leftPct  = ((vmin - parseFloat(cbSliderA.min)) / totalRange) * 100;
+    const rightPct = ((vmax - parseFloat(cbSliderA.min)) / totalRange) * 100;
+    cbFill.style.left  = leftPct  + '%';
+    cbFill.style.width = (rightPct - leftPct) + '%';
+  }
+}
+
+let cbRerenderTimer;
+function onColorbarChange() {
+  _updateCbDisplay();
+  clearTimeout(cbRerenderTimer);
+  cbRerenderTimer = setTimeout(_applyColorbar, 150);
+}
+
+async function _applyColorbar() {
+  if (!currentScene || activeView === 'rgb') return;
+  const v1   = parseFloat(cbSliderA.value);
+  const v2   = parseFloat(cbSliderB.value);
+  const vmin = Math.min(v1, v2);
+  const vmax = Math.max(v1, v2);
+
+  // Store the user's current adjustment for this view
+  currentRanges[activeView] = { vmin, vmax };
+
+  try {
+    const url = `/api/render?scene_id=${currentScene.scene_id}` +
+                `&view=${encodeURIComponent(activeView)}&vmin=${vmin}&vmax=${vmax}`;
+    const res  = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const img = new Image();
+    img.src   = data.image;
+    await new Promise(r => { img.onload = r; img.onerror = r; });
+    imageCache[activeView] = img;
+
+    // Sync thumbnail
+    const thumbImg = document.getElementById(`thumb-${activeView}`);
+    if (thumbImg) thumbImg.src = img.src;
+
+    redraw();
+  } catch (e) {
+    console.error('Colorbar re-render failed:', e);
+  }
+}
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</body>
+</html>

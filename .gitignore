@@ -1,0 +1,23 @@
+# Imagery data (large NetCDF files; not tracked)
+imagery/**/*.nc
+
+# Keep imagery subdirectory structure
+!imagery/
+!imagery/sentinel2/
+!imagery/landsat_89/
+!imagery/landsat_45/
+
+# Database (auto-created on startup; may contain user data)
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+
+# pixi environment (large; reproducible from pixi.toml + pixi.lock)
+.pixi/
+
+# macOS
+.DS_Store

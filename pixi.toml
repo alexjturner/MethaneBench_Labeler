@@ -1,0 +1,22 @@
+[project]
+name = "methane-plume-labeller"
+version = "0.1.0"
+description = "Web-based methane plume annotation tool"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64"]
+
+[dependencies]
+python     = ">=3.11"
+fastapi    = ">=0.104.0"
+uvicorn    = ">=0.24.0"
+netcdf4    = ">=1.6.0"
+numpy      = ">=1.24.0"
+pillow     = ">=10.0.0"
+matplotlib = ">=3.7.0"
+pydantic   = ">=2.0.0"
+
+[tasks]
+# Local dev — imagery folder sits one level up from this directory
+dev   = "IMAGERY_PATH=./imagery uvicorn app:app --host 127.0.0.1 --port 8000"
+# Production — set IMAGERY_PATH to wherever imagery lives on the server
+start = "uvicorn app:app --host 0.0.0.0 --port 8000"
