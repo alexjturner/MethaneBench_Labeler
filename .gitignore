@@ -10,6 +10,9 @@ imagery/**/*.nc
 # Database (auto-created on startup; may contain user data)
 *.db
 
+# Don't include any swap files
+*.swp
+
 # Python
 __pycache__/
 *.py[cod]
