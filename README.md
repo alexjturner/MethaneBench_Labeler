@@ -1,4 +1,4 @@
-# Methane Plume Labeler
+# MethaneBench Plume Labeler
 
 A web-based tool for crowd-sourced annotation of methane plumes in multispectral satellite imagery. Part of the [FETCH₄ project](https://fetch4.github.io).
 
