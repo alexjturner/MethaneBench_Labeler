@@ -190,3 +190,80 @@ landsat_89     38.5800    54.2090     0    # 2013-07-23
 sentinel2      37.7170    53.9270     1    # 2016-06-04
 sentinel2      37.7170    53.9270   299    # 2026-05-28
 landsat_89     37.7170    53.9270     0    # 2013-07-07
+
+# ── New additions from postdoc Landsat5 + training-data detection list ─────────
+# (Ehret+ EST, Irakulis-Loxitxate+ EST; acq_idx=0 throughout — verify against imagery)
+#
+# NOTE: T4 (lat=39.474, lon=53.743) above is labeled "negative example" (1% CH4Net
+# positive) yet appears in this list as lon=53.744/lat=39.473 with 244 detections —
+# the highest-detection site. T2 (lat=39.522, lon=53.773) similarly labeled negative
+# but shows 4 detections. Worth revisiting those labels.
+
+# Uzbekistan / Karakalpakstan gas field (127 detections)
+sentinel2      40.8000    61.2900     0    # TBD
+landsat_89     40.8000    61.2900     0    # TBD
+landsat_45     40.8000    61.2900     0    # TBD
+
+# Turkmenistan Ahal province / NE Iran (119 detections)
+sentinel2      36.4330    61.4770     0    # TBD
+landsat_89     36.4330    61.4770     0    # TBD
+landsat_45     36.4330    61.4770     0    # TBD
+
+# Algeria — Oued Mya basin, separate pad from Hassi R'Mel entry (58 detections)
+sentinel2      32.8410     3.2430     0    # TBD
+landsat_89     32.8410     3.2430     0    # TBD
+landsat_45     32.8410     3.2430     0    # TBD
+
+# Algeria south / Saharan O&G (12 detections)
+sentinel2      28.6990     7.5850     0    # TBD
+landsat_89     28.6990     7.5850     0    # TBD
+landsat_45     28.6990     7.5850     0    # TBD
+
+# Egypt Western Desert (10 detections)
+sentinel2      31.0760    26.6820     0    # TBD
+landsat_89     31.0760    26.6820     0    # TBD
+landsat_45     31.0760    26.6820     0    # TBD
+
+# Turkmenistan Cheleken Peninsula (6 detections)
+sentinel2      39.0460    54.5870     0    # TBD
+landsat_45     39.0460    54.5870     0    # TBD
+
+# Kazakhstan Pre-Caspian basin (5 detections)
+sentinel2      45.0920    55.0820     0    # TBD
+landsat_45     45.0920    55.0820     0    # TBD
+
+# Turkmenistan Mary province / NW Afghanistan (3 detections)
+sentinel2      38.3950    62.5000     0    # TBD
+landsat_45     38.3950    62.5000     0    # TBD
+
+# Turkmenistan Mary province / NW Afghanistan #2 (3 detections)
+sentinel2      38.7480    62.5680     0    # TBD
+landsat_45     38.7480    62.5680     0    # TBD
+
+# Turkmenistan / Afghanistan border area (3 detections)
+sentinel2      37.3460    61.0000     0    # TBD
+landsat_45     37.3460    61.0000     0    # TBD
+
+# Central Turkmenistan (3 detections)
+sentinel2      38.0970    54.1690     0    # TBD
+landsat_45     38.0970    54.1690     0    # TBD
+
+# Permian Basin TX — new pad (3 detections)
+sentinel2      31.8810  -103.8690     0    # TBD
+landsat_45     31.8810  -103.8690     0    # TBD
+
+# Permian Basin NM — Eddy County (3 detections)
+sentinel2      32.2240  -103.4920     0    # TBD
+landsat_45     32.2240  -103.4920     0    # TBD
+
+# Permian Basin NM — Eddy County #2 (3 detections)
+sentinel2      32.4000  -103.3900     0    # TBD
+landsat_45     32.4000  -103.3900     0    # TBD
+
+# Permian Basin TX — Midland/Ector area (3 detections)
+sentinel2      31.5840  -102.1600     0    # TBD
+landsat_45     31.5840  -102.1600     0    # TBD
+
+# Algeria south — Illizi/Tamanrasset basin (3 detections)
+sentinel2      28.4600     1.5050     0    # TBD
+landsat_45     28.4600     1.5050     0    # TBD

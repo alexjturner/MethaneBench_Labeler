@@ -1,5 +1,6 @@
 # Imagery data (large NetCDF files; not tracked)
 imagery/**/*.nc
+imagery/**/*.nc~
 
 # Keep imagery subdirectory structure
 !imagery/
@@ -10,8 +11,9 @@ imagery/**/*.nc
 # Database (auto-created on startup; may contain user data)
 *.db
 
-# Don't include any swap files
+# Don't include any swap files or temp netCDF files
 *.swp
+*.nc~
 
 # Python
 __pycache__/
