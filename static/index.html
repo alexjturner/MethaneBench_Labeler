@@ -319,12 +319,14 @@ main {
 /* ── Location map ─────────────────────────────────────────────────────── */
 #location-map {
   width: 100%;
-  height: 128px;
+  height: 180px;
+  isolation: isolate;     /* keep Leaflet panes below page overlays */
   border-radius: 7px;
   overflow: hidden;
   cursor: pointer;
   border: 1px solid var(--border);
 }
+#location-map .leaflet-control-attribution { font-size: 9px; }
 /* Star marker */
 .map-star {
   color: #ff453a;
@@ -339,32 +341,32 @@ main {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 14px;
-  min-width: 220px;
-  width: 220px;
+  padding: 18px;
+  min-width: 320px;
+  width: 320px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 .section-title {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   color: var(--muted);
-  margin-bottom: 7px;
+  margin-bottom: 8px;
 }
 
 .instructions {
   background: var(--bg);
   border-radius: 7px;
-  padding: 10px 11px;
-  font-size: 11px;
-  line-height: 1.65;
+  padding: 12px 14px;
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--muted);
 }
-.instructions li   { margin-left: 13px; margin-bottom: 3px; }
+.instructions li   { margin-left: 18px; margin-bottom: 6px; }
 .instructions .key {
   display: inline-block;
   background: var(--panel);
@@ -372,7 +374,7 @@ main {
   border-radius: 3px;
   padding: 0 4px;
   font-family: monospace;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--text);
 }
 
@@ -380,21 +382,23 @@ main {
 .polygon-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 14px;
 }
-.poly-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.poly-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
 .poly-label  { flex: 1; color: var(--muted); }
 .poly-del    { cursor: pointer; color: var(--danger); font-size: 15px; line-height: 1; opacity: 0.7; }
 .poly-del:hover { opacity: 1; }
-.empty-poly  { color: var(--muted); font-size: 12px; font-style: italic; }
+.empty-poly  { color: var(--muted); font-size: 14px; font-style: italic; }
+.controls-panel .btn-sm { font-size: 14px; padding: 8px 12px; }
+.controls-panel .btn-full { font-size: 16px; padding: 12px; }
 
 .submit-section { display: flex; flex-direction: column; gap: 7px; margin-top: auto; }
 
 .no-plume-btn {
   width: 100%;
-  padding: 9px;
-  font-size: 13px;
+  padding: 11px;
+  font-size: 15px;
   border-radius: 8px;
   border: 2px solid var(--warning);
   background: transparent;
@@ -551,6 +555,114 @@ footer .footer-sep { color: var(--border); }
   border-radius: 0;
 }
 
+/* ── Instructions screen ──────────────────────────────────────────────── */
+#instructions {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;            /* above app, below #loading */
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 32px 24px;
+}
+#instructions.visible { display: block; }
+.instr-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 44px;
+  max-width: 1000px;
+  margin: 0 auto;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.instr-card h2 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+.instr-card h3 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 30px 0 10px;
+}
+.instr-card p      { margin-bottom: 10px; }
+.instr-card .lead  { color: var(--muted); font-size: 17px; }
+.instr-card ul, .instr-card ol { margin: 0 0 10px 22px; }
+.instr-card li     { margin-bottom: 6px; }
+.instr-card .key {
+  display: inline-block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-family: monospace;
+  font-size: 14px;
+}
+.view-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.view-table td { padding: 8px 10px; border-top: 1px solid var(--border); vertical-align: top; }
+.view-table td:first-child { font-weight: 700; white-space: nowrap; width: 110px; }
+.view-table td:last-child  { color: var(--muted); }
+
+.example-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.example-card {
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.example-card.good { border-color: var(--success); }
+.example-card.bad  { border-color: var(--danger); }
+.example-img {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: #2a2a2c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+.example-img img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.example-body { padding: 14px 16px; font-size: 15px; }
+.example-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 9px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.good .example-tag { background: #1a3a1a; color: var(--success); }
+.bad  .example-tag { background: #4a1c1a; color: var(--danger); }
+.example-body p { color: var(--muted); margin: 0; }
+
+.instr-actions { margin-top: 32px; text-align: center; }
+.instr-actions .btn { font-size: 17px; padding: 14px 40px; }
+
+.header-link {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.header-link:hover { border-color: var(--muted); }
+
 /* ── Done screen ──────────────────────────────────────────────────────── */
 #done {
   display: none;
@@ -657,6 +769,7 @@ footer .footer-sep { color: var(--border); }
     <div class="header-spacer"></div>
     <div class="header-stat">Labeled: <strong id="hdr-count">0</strong></div>
     <div class="header-stat">Scenes: <strong id="hdr-total">—</strong></div>
+    <button class="header-link" onclick="showInstructions()">Instructions</button>
     <div class="user-badge">Logged in as <span id="hdr-user"></span></div>
   </header>
 
@@ -779,6 +892,79 @@ footer .footer-sep { color: var(--border); }
   </div>
 </div>
 
+<!-- ── Instructions ─────────────────────────────────────────────────────── -->
+<div id="instructions">
+  <div class="instr-card">
+    <h2>How to label methane plumes</h2>
+    <p class="lead">Please read this short guide before you start. You can reopen it any time with the
+      <strong>Instructions</strong> button in the top bar.</p>
+
+    <h3>Your task</h3>
+    <p>Each scene is a small patch of satellite imagery. For every scene, decide whether a methane plume is visible:</p>
+    <ul>
+      <li>If you see one or more plumes, <strong>draw a polygon around each plume</strong>, then click <strong>Submit</strong>.</li>
+      <li>If there is no plume, click <strong>No plume visible</strong>, then <strong>Submit</strong>.</li>
+    </ul>
+
+    <h3>The image views</h3>
+    <p>Click the thumbnails to the right of the main image to switch views. Your polygons stay in place when you switch, so you can check one outline against several views.</p>
+    <table class="view-table">
+      <tr><td>RGB</td><td>True-colour image. Use it to see the surface: facilities, roads, fields, water, clouds.</td></tr>
+      <tr><td>Methane</td><td>Methane signal compared with the same-year background. Red means unusually strong SWIR absorption, which is where plumes usually show up.</td></tr>
+      <tr><td>dR</td><td>Raw methane proxy, (SWIR1 &minus; SWIR2) / (SWIR1 + SWIR2). Red means positive dR (possible absorption).</td></tr>
+      <tr><td>NDVI</td><td>Vegetation index (tan = bare soil, green = vegetation). Use it to check whether a methane-view feature just follows a land-cover edge.</td></tr>
+      <tr><td>Cloud</td><td>Approximate cloud likelihood. Light gray areas are probably cloudy, and clouds can cause false methane signals.</td></tr>
+    </table>
+    <p>Use the <strong>Range</strong> slider above the image to adjust the color stretch in the Methane and dR views.</p>
+
+    <h3>Drawing polygons</h3>
+    <ol>
+      <li><strong>Click</strong> on the image to place each corner of the polygon.</li>
+      <li><strong>Double-click</strong>, or click the first corner again, to close the polygon.</li>
+      <li>Draw a <strong>separate polygon for each plume</strong> if there is more than one.</li>
+      <li>Press <span class="key">Esc</span> to cancel a polygon you are still drawing, or click <strong>Undo last polygon</strong> to remove the last one.</li>
+    </ol>
+
+    <h3>Examples</h3>
+    <div class="example-grid">
+      <div class="example-card good">
+        <div class="example-img">
+          Example image coming soon
+          <img src="/static/tutorial/good_label.png" alt="Good label example" onerror="this.remove()">
+        </div>
+        <div class="example-body">
+          <span class="example-tag">Good label</span>
+          <p>The polygon follows the edge of the plume closely and includes the whole plume without much background.</p>
+        </div>
+      </div>
+      <div class="example-card bad">
+        <div class="example-img">
+          Example image coming soon
+          <img src="/static/tutorial/bad_label_too_large.png" alt="Polygon too large example" onerror="this.remove()">
+        </div>
+        <div class="example-body">
+          <span class="example-tag">Bad label: too large</span>
+          <p>The polygon reaches well past the plume boundary and includes a lot of background. Keep the outline tight to the plume.</p>
+        </div>
+      </div>
+      <div class="example-card bad">
+        <div class="example-img">
+          Example image coming soon
+          <img src="/static/tutorial/bad_label_not_plume.png" alt="Non-plume area labeled example" onerror="this.remove()">
+        </div>
+        <div class="example-body">
+          <span class="example-tag">Bad label: not a plume</span>
+          <p>The polygon covers something that is not a plume, such as a surface feature, cloud edge, or noise. Check the other views before labeling.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="instr-actions">
+      <button class="btn btn-primary" onclick="closeInstructions()">Okay, I'm ready!</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Loading ──────────────────────────────────────────────────────────── -->
 <div id="loading">
   <div class="spinner"></div>
@@ -860,6 +1046,7 @@ async function startLabeling() {
 
     document.getElementById('welcome').style.display = 'none';
     document.getElementById('app').style.display     = 'flex';
+    if (!hasSeenInstructions()) showInstructions();
     initMap();
     await loadNextScene();
   } catch (e) {
@@ -1144,7 +1331,6 @@ function initMap() {
   if (locMap) return;
   locMap = L.map('location-map', {
     zoomControl:       false,
-    attributionControl: false,
     scrollWheelZoom:   false,
     dragging:          false,
     touchZoom:         false,
@@ -1153,10 +1339,12 @@ function initMap() {
     keyboard:          false,
   }).setView([20, 15], 1);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 19,
+  // Esri World Light Gray (no API key needed; CARTO tiles now require one)
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 16,
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
   }).addTo(locMap);
+  locMap.attributionControl.setPrefix(false);
 
   // Clicking anywhere on the map opens Google Maps at the current scene coords
   locMap.on('click', () => {
@@ -1180,6 +1368,28 @@ function updateMap(clat, clon) {
 
   locMarker = L.marker([clat, clon], { icon: starIcon, interactive: false })
     .addTo(locMap);
+  locMap.setView([clat, clon], 1);   // keep the star in view (e.g. Americas)
+}
+
+// ── Instructions screen ─────────────────────────────────────────────────
+// Shown automatically on a user's first login (remembered per username in
+// this browser); can be reopened from the header.
+function instructionsKey() { return 'mb_seen_instructions_' + userId; }
+
+function hasSeenInstructions() {
+  try { return localStorage.getItem(instructionsKey()) === '1'; }
+  catch (e) { return false; }
+}
+
+function showInstructions() {
+  const el = document.getElementById('instructions');
+  el.classList.add('visible');
+  el.scrollTop = 0;
+}
+
+function closeInstructions() {
+  document.getElementById('instructions').classList.remove('visible');
+  try { localStorage.setItem(instructionsKey(), '1'); } catch (e) {}
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
