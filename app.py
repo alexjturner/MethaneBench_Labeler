@@ -7,6 +7,8 @@ Run with:
 Environment variables:
     IMAGERY_PATH  - path to imagery folder (default: ./imagery)
     DB_PATH       - path to SQLite database file (default: ./labels.db)
+    MAX_INVALID_FRAC - skip acquisitions with more than this fraction of
+                       invalid (NaN / all-zero) pixels (default: 0.5)
 """
 
 import io, json, base64, sqlite3, random, os
@@ -37,6 +39,7 @@ from pydantic import BaseModel
 IMAGERY_PATH       = Path(os.environ.get("IMAGERY_PATH", "imagery"))
 DB_PATH            = Path(os.environ.get("DB_PATH", "labels.db"))
 CALIBRATION_FILE   = Path(os.environ.get("CALIBRATION_FILE", "calibration_scenes.txt"))
+MAX_INVALID_FRAC   = float(os.environ.get("MAX_INVALID_FRAC", "0.5"))
 DISPLAY_SCALE      = 4        # upscale factor for display (129x138 → 516x552)
 
 # Landsat 7 excluded due to scan-line striping artifacts
@@ -54,13 +57,24 @@ scene_index: list = []    # [(instr, clat, clon, acq_idx), ...]  shuffled w/ see
 scene_by_id: dict = {}    # int scene_id → (instr, clat, clon, acq_idx)
 scene_to_id: dict = {}    # (instr, clat, clon, acq_idx) → int scene_id
 loaded_data: dict = {}    # "instr|clat|clon" → {channels, years, months, days, ...}
+invalid_ids: set  = set() # scene_ids never served (too many invalid pixels)
 
 
 def _dkey(instr: str, clat: float, clon: float) -> str:
     return f"{instr}|{clat}|{clon}"
 
 
+def _invalid_fraction(channels) -> np.ndarray:
+    """Per-acquisition fraction of pixels that are NaN/masked in any band or zero in all bands."""
+    ch  = np.ma.filled(np.ma.asarray(channels, dtype=np.float32), np.nan)
+    bad = np.isnan(ch).any(axis=-1) | (ch <= 0).all(axis=-1)
+    return bad.reshape(bad.shape[0], -1).mean(axis=1)
+
+
 def load_all_data():
+    # Invalid scenes stay in scene_index so scene_ids (stored in labels.db) are
+    # unchanged; they are only excluded from serving.
+    invalid_scenes = set()
     for instr_key, folder_name in INSTRUMENTS.items():
         folder = IMAGERY_PATH / folder_name
         if not folder.exists():
@@ -83,9 +97,14 @@ def load_all_data():
                     channels=channels, years=years, months=months, days=days,
                     clat=clat, clon=clon, resolution=res, instrument=instr_key,
                 )
+                bad_frac = _invalid_fraction(channels)
                 for i in range(channels.shape[0]):
                     scene_index.append((instr_key, clat, clon, i))
-                print(f"  Loaded {channels.shape[0]:4d} scenes: {nc_file.name}")
+                    if bad_frac[i] > MAX_INVALID_FRAC:
+                        invalid_scenes.add((instr_key, clat, clon, i))
+                n_bad = int((bad_frac > MAX_INVALID_FRAC).sum())
+                print(f"  Loaded {channels.shape[0]:4d} scenes: {nc_file.name}"
+                      + (f"  ({n_bad} excluded: >{MAX_INVALID_FRAC:.0%} invalid pixels)" if n_bad else ""))
             except Exception as e:
                 print(f"  [error] {nc_file.name}: {e}")
 
@@ -96,8 +115,11 @@ def load_all_data():
     for i, scene in enumerate(scene_index):
         scene_by_id[i] = scene
         scene_to_id[scene] = i
+        if scene in invalid_scenes:
+            invalid_ids.add(i)
 
-    print(f"  Total scenes: {len(scene_index)}")
+    print(f"  Total scenes: {len(scene_index)}  "
+          f"(excluded {len(invalid_ids)} with >{MAX_INVALID_FRAC:.0%} invalid pixels)")
     _load_calibration_scenes()
 
 
@@ -393,13 +415,14 @@ async def next_scene(user_id: str = Query(...)):
     if n_cal_done < len(cal_scenes):
         for scene_tuple in cal_scenes:
             sid = scene_to_id.get(scene_tuple)
-            if sid is not None and sid not in labeled_ids:
+            if sid is not None and sid not in labeled_ids and sid not in invalid_ids:
                 return _scene_payload(sid, is_calibration=True)
 
     # Then random unlabeled scene (excluding calibration scenes)
     cal_ids   = {scene_to_id[s] for s in cal_scenes if s in scene_to_id}
     available = [sid for sid in range(len(scene_index))
-                 if sid not in labeled_ids and sid not in cal_ids]
+                 if sid not in labeled_ids and sid not in cal_ids
+                 and sid not in invalid_ids]
     if not available:
         return {"done": True, "message": "You've labeled every available scene — thank you!"}
 
@@ -457,7 +480,7 @@ async def stats():
     return {
         "total_labels": n_labels,
         "total_users":  n_users,
-        "total_scenes": len(scene_index),
+        "total_scenes": len(scene_index) - len(invalid_ids),
     }
 
 
