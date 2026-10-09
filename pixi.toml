@@ -18,5 +18,7 @@ pydantic   = ">=2.0.0"
 [tasks]
 # Local dev — imagery folder sits one level up from this directory
 dev   = "IMAGERY_PATH=./imagery uvicorn app:app --host 127.0.0.1 --port 8000"
+# Branch preview — test copy on its own port + DB (see README_TESTING.md)
+preview = "IMAGERY_PATH=./imagery DB_PATH=./test_labels.db MPLCONFIGDIR=/tmp uvicorn app:app --host 127.0.0.1 --port 8001"
 # Production — set IMAGERY_PATH to wherever imagery lives on the server
 start = "uvicorn app:app --host 0.0.0.0 --port 8000"
