@@ -1,4 +1,4 @@
-[project]
+[workspace]
 name = "methane-plume-labeller"
 version = "0.1.0"
 description = "Web-based methane plume annotation tool"
