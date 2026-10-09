@@ -64,6 +64,7 @@ All configuration is via environment variables:
 | `IMAGERY_PATH` | `./imagery` | Path to the imagery folder |
 | `DB_PATH` | `./labels.db` | Path to the SQLite labels database |
 | `CALIBRATION_FILE` | `./calibration_scenes.txt` | Path to calibration scene list |
+| `MAX_INVALID_FRAC` | `0.5` | Acquisitions with more than this fraction of invalid (NaN / all-zero) pixels are never shown |
 
 ## Imagery format
 
