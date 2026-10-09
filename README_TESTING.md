@@ -85,7 +85,13 @@ Wait for `Ready.` in the output, then open <http://localhost:8001>.
 - If you're on the server (e.g. a remote desktop session), open it in a browser there.
 - If you're on your laptop, forward the port first:
   `ssh -L 8001:localhost:8001 <user>@<server>`, then browse to
-  <http://localhost:8001> locally.
+  <http://localhost:8001> locally. If the server runs on a compute node behind
+  a login host, jump through the login host with `-J`. For example, with the
+  test server on `h1` behind `hermes`:
+
+  ```
+  ssh -J hikarim@hermes.atmos.uw.edu -L 8001:localhost:8001 hikarim@h1
+  ```
 
 Changes to `static/` (HTML/JS/CSS) only need a browser refresh. Changes to
 `app.py` need a server restart (Ctrl-C, then `pixi run preview` again), or add
