@@ -389,6 +389,16 @@ main {
 .poly-label  { flex: 1; color: var(--muted); }
 .poly-del    { cursor: pointer; color: var(--danger); font-size: 15px; line-height: 1; opacity: 0.7; }
 .poly-del:hover { opacity: 1; }
+.poly-eye    { cursor: pointer; font-size: 14px; line-height: 1; opacity: 0.8; user-select: none; }
+.poly-eye:hover { opacity: 1; }
+.polygon-item.hidden-poly .poly-swatch,
+.polygon-item.hidden-poly .poly-label { opacity: 0.4; }
+.polygon-item.hidden-poly .poly-label { text-decoration: line-through; }
+.poly-toggle-all {
+  float: right; cursor: pointer; text-transform: none; letter-spacing: 0;
+  font-weight: 600; color: var(--muted);
+}
+.poly-toggle-all:hover { color: var(--text); }
 .empty-poly  { color: var(--muted); font-size: 14px; font-style: italic; }
 .controls-panel .btn-sm { font-size: 14px; padding: 8px 12px; }
 .controls-panel .btn-full { font-size: 16px; padding: 12px; }
@@ -849,12 +859,16 @@ footer .footer-sep { color: var(--border); }
             <li>Draw <strong>multiple polygons</strong> for multiple plumes</li>
             <li>Click a thumbnail to switch the active view</li>
             <li><span class="key">Esc</span> cancels the polygon in progress</li>
+            <li><span class="key">H</span> hides/shows drawn polygons</li>
           </ul>
         </div>
       </div>
 
       <div>
-        <div class="section-title">Polygons drawn <span id="poly-count">(0)</span></div>
+        <div class="section-title">Polygons drawn <span id="poly-count">(0)</span>
+          <span class="poly-toggle-all" id="poly-toggle-all" onclick="toggleAllPolys()"
+                title="Show/hide all polygons (H)" style="display:none">Hide all</span>
+        </div>
         <div class="polygon-list" id="polygon-list">
           <div class="empty-poly" id="empty-poly-msg">No polygons drawn yet.</div>
         </div>
@@ -990,6 +1004,7 @@ let currentScene   = null;
 let activeView     = 'rgb';
 let imageCache     = {};     // view → HTMLImageElement
 let completedPolys = [];     // [[{x,y},...], ...]  display coords
+let polyVisible    = [];     // parallel to completedPolys: true = drawn on canvas
 let currentPoly    = [];
 let mousePos       = {x: 0, y: 0};
 let noPlume        = false;
@@ -1141,6 +1156,7 @@ function redraw() {
 
   // Completed polygons
   completedPolys.forEach((poly, i) => {
+    if (!polyVisible[i]) return;
     const color = POLY_COLORS[i % POLY_COLORS.length];
     ctx.beginPath();
     ctx.moveTo(poly[0].x, poly[0].y);
@@ -1228,11 +1244,14 @@ canvas.addEventListener('dblclick', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { currentPoly = []; redraw(); }
+  if ((e.key === 'h' || e.key === 'H') && currentScene
+      && !e.target.matches('input, textarea, select')) toggleAllPolys();
 });
 
 function closePoly() {
   if (currentPoly.length < 3) { currentPoly = []; redraw(); return; }
   completedPolys.push([...currentPoly]);
+  polyVisible.push(true);
   currentPoly = [];
   updatePolyList();
   redraw();
@@ -1240,13 +1259,29 @@ function closePoly() {
 
 function undoLast() {
   if (currentPoly.length > 0) { currentPoly = []; }
-  else                         { completedPolys.pop(); }
+  else                         { completedPolys.pop(); polyVisible.pop(); }
   updatePolyList();
   redraw();
 }
 
 function deletePolygon(idx) {
   completedPolys.splice(idx, 1);
+  polyVisible.splice(idx, 1);
+  updatePolyList();
+  redraw();
+}
+
+// Hidden polygons are only hidden from view; they are still submitted.
+function togglePolyVisible(idx) {
+  polyVisible[idx] = !polyVisible[idx];
+  updatePolyList();
+  redraw();
+}
+
+function toggleAllPolys() {
+  if (completedPolys.length === 0) return;
+  const show = !polyVisible.some(v => v);   // any visible → hide all; none → show all
+  polyVisible = polyVisible.map(() => show);
   updatePolyList();
   redraw();
 }
@@ -1257,6 +1292,9 @@ function updatePolyList() {
   const undoBtn = document.getElementById('btn-undo');
   document.getElementById('poly-count').textContent = `(${completedPolys.length})`;
   undoBtn.disabled = completedPolys.length === 0 && currentPoly.length === 0;
+  const toggleAll = document.getElementById('poly-toggle-all');
+  toggleAll.style.display = completedPolys.length ? '' : 'none';
+  toggleAll.textContent   = polyVisible.some(v => v) ? 'Hide all' : 'Show all';
 
   Array.from(list.children).forEach(c => { if (c !== empty) c.remove(); });
 
@@ -1267,8 +1305,10 @@ function updatePolyList() {
     completedPolys.forEach((poly, i) => {
       const color = POLY_COLORS[i % POLY_COLORS.length];
       const item  = document.createElement('div');
-      item.className = 'polygon-item';
+      item.className = 'polygon-item' + (polyVisible[i] ? '' : ' hidden-poly');
       item.innerHTML = `
+        <span class="poly-eye" onclick="togglePolyVisible(${i})"
+              title="${polyVisible[i] ? 'Hide' : 'Show'} polygon">${polyVisible[i] ? '👁' : '◌'}</span>
         <div class="poly-swatch" style="background:${color}"></div>
         <span class="poly-label">Polygon ${i + 1} (${poly.length} pts)</span>
         <span class="poly-del" onclick="deletePolygon(${i})" title="Delete">×</span>`;
@@ -1280,7 +1320,7 @@ function updatePolyList() {
 // ── No-plume toggle ─────────────────────────────────────────────────────
 function toggleNoPlume() {
   noPlume = !noPlume;
-  if (noPlume) { completedPolys = []; currentPoly = []; updatePolyList(); redraw(); }
+  if (noPlume) { completedPolys = []; polyVisible = []; currentPoly = []; updatePolyList(); redraw(); }
   updateNoPlumeBtn();
 }
 function updateNoPlumeBtn() {
@@ -1394,7 +1434,7 @@ function closeInstructions() {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 function resetDrawingState() {
-  completedPolys = []; currentPoly = []; noPlume = false;
+  completedPolys = []; polyVisible = []; currentPoly = []; noPlume = false;
   updatePolyList(); updateNoPlumeBtn();
 }
 
