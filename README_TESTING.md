@@ -108,3 +108,83 @@ Changes to `static/` (HTML/JS/CSS) only need a browser refresh. Changes to
   only affects the test copy.
 - `check_running.csh` (the live watchdog) only looks at the live user's own
   processes, so your test server won't interfere with it. 
+# GEE imagery and reference scenes on the server
+
+The `gee-imagery` branch adds imagery pulled from Google Earth Engine
+(`gee_fetch.py`), reference scenes with known answers (MARS-S2L and the
+Stanford controlled releases) and calibration lists built from them. Below,
+`$DATA` is a data folder on the server outside the live `bench4` folder.
+
+## 1. Code and Earth Engine login (one-time)
+
+```tcsh
+cd /path/to/MethaneBench_Labeler
+git fetch && git checkout gee-imagery
+pixi install
+pixi run earthengine authenticate --auth_mode=notebook   # headless: paste the code from the browser
+```
+
+The pulls use the GEE project `aerial-history-project` (`--project` to change).
+
+## 2. Copy what is already pulled (for the test deployment)
+
+The calibration lists index into these exact files, so copy them rather than
+re-pulling. From the laptop, with the T7 drive mounted:
+
+```tcsh
+rsync -av --progress "/Volumes/T7 Shield/MethaneBench/" <user>@<server>:$DATA/ --exclude co2_transfer
+```
+
+| Folder | Contents |
+|---|---|
+| `mars_s2l/meta/` | MARS-S2L `validated_images_all.csv` (labels + plume outlines) |
+| `mars_s2l/imagery/` | 2,159 MARS target dates; `calibration_mars.txt` (45 scenes: obvious / harder / no plume) |
+| `controlled_releases/imagery/` | Casa Grande 2022 overpasses; `calibration_releases.txt` (14 scenes) |
+| `pi_calibration/` | the original calibration pull (`imagery_gee_compact/`, `imagery_gee_extra_compact/`) |
+| `proposals/additional_sites.csv` | candidate sites for further pulls |
+
+## 3. Test deployment
+
+The app reads one imagery folder. To serve the MARS and release scenes
+together, link both pulls into one folder and join the two lists:
+
+```tcsh
+cd $DATA
+foreach s ( sentinel2 landsat_89 )
+  mkdir -p imagery_ref/$s
+  ln -s $DATA/mars_s2l/imagery/normalized/$s/*.nc imagery_ref/$s/
+  ln -s $DATA/controlled_releases/imagery/normalized/$s/*.nc imagery_ref/$s/
+end
+cat mars_s2l/imagery/calibration_mars.txt controlled_releases/imagery/calibration_releases.txt > imagery_ref/calibration_ref.txt
+
+cd /path/to/MethaneBench_Labeler
+setenv IMAGERY_PATH $DATA/imagery_ref
+setenv CALIBRATION_FILE $DATA/imagery_ref/calibration_ref.txt
+setenv DB_PATH ./test_labels.db
+setenv MPLCONFIGDIR /tmp
+pixi run uvicorn app:app --host 127.0.0.1 --port 8001
+```
+
+Then forward port 8001 as in section 2 above. The same rules apply: never
+port 63951, keep `--host 127.0.0.1`.
+
+## 4. Fuller pull
+
+Run long pulls in `tmux` or `screen`. Re-running a command resumes it, skipping
+sites already complete. Files are written compact (int16); the MARS pull averaged
+about 12 MB per site, sensor and year.
+
+```tcsh
+# MARS-S2L: more labelled dates per site and sensor (default 2 + 2)
+pixi run python mars_targets.py $DATA/mars_s2l/meta/validated_images_all.csv \
+    --k-plume 6 --k-clear 6 --out $DATA/mars_s2l/targets_full
+pixi run python gee_fetch.py --calibration $DATA/mars_s2l/targets_full/mars_targets.txt \
+    --all --out $DATA/mars_s2l/imagery_full
+
+# Calibration lists for the new pull (acq_idx changes with each pull)
+pixi run python select_calibration.py $DATA/mars_s2l/imagery_full \
+    --out $DATA/mars_s2l/imagery_full/calibration_mars.txt
+```
+
+Check free space (`df -h $DATA`) before the MARS pull: the 2 + 2 pull was
+9.2 GB, and each extra target year adds background for that site and sensor.
