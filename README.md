@@ -13,10 +13,10 @@ Users are presented with satellite scenes one at a time and asked to draw polygo
 
 **Spectral views available per scene:**
 - **RGB** — true-colour composite (percentile-stretched)
-- **DR** — differential ratio (SWIR1 − SWIR2) / (SWIR1 + SWIR2), sensitive to CH₄ absorption
-- **Z-score** — DR anomaly relative to same-year background acquisitions
+- **Methane** — methane signal: the differential ratio dR = (SWIR1 − SWIR2) / (SWIR1 + SWIR2) as a per-pixel z-score against the site's other acquisitions from the same year (all years if fewer than 5), leaving out their cloudy pixels; fixed ±3 colour range
+- **Hi-res** — Esri World Imagery basemap of the scene area (live, context only; not from the scene date)
 - **NDVI** — vegetation index for context
-- **Cloud** — brightness-based cloud mask
+- **Mask** — cloud / cloud-shadow mask from the satellite product (Cloud Score+ for Sentinel-2, QA_PIXEL for Landsat); can also be overlaid on any view
 
 **Calibration scenes** (defined in `calibration_scenes.txt`) are shown to every user first, in priority order, before random scenes are served. This ensures inter-annotator agreement can be assessed on a common set.
 

@@ -234,13 +234,26 @@ main {
   display: flex;
   gap: 0;
 }
+/* Fixed-size image box: every scene is scaled to fit, whatever its pixel size */
 .canvas-wrapper {
   position: relative;
   cursor: crosshair;
   line-height: 0;
   flex-shrink: 0;
+  width: var(--display-box);
+  height: var(--display-box);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
 }
-#canvas { display: block; }
+#canvas { display: block; image-rendering: pixelated; }
+/* Interactive high-resolution basemap, shown in place of the canvas */
+.hires-map { display: none; cursor: grab; line-height: normal; isolation: isolate; }   /* keep Leaflet's layers below the info panel */
+.hires-map .leaflet-control-attribution { font-size: 9px; }
+/* At fractional zoom Chrome smooths tile edges into hairline seams; nearest-neighbour
+   scaling keeps edges hard so tiles butt together cleanly */
+.hires-map .leaflet-tile { image-rendering: pixelated; }
 
 .canvas-overlay-msg {
   position: absolute;
@@ -259,15 +272,16 @@ main {
 }
 .canvas-overlay-msg.visible { opacity: 1; }
 
-/* Thumbnail strip — height is set by JS to match the canvas exactly */
+/* Thumbnail strip — same height as the fixed image box */
 .thumb-strip {
+  height: var(--display-box);
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 6px;
   background: var(--bg);
   border-left: 1px solid var(--border);
-  overflow: hidden;
+  overflow-y: auto;    /* only scrolls in very short windows */
 }
 .thumb-item {
   cursor: pointer;
@@ -275,20 +289,17 @@ main {
   border-radius: 6px;
   overflow: hidden;
   transition: border-color 0.15s;
-  flex: 1;           /* fill equal share of strip height */
-  min-height: 0;
+  flex: 0 0 auto;    /* natural height: thumbnails keep the scene's aspect ratio */
   display: flex;
   flex-direction: column;
-  width: 88px;
+  width: clamp(56px, calc(var(--display-box) / 5 - 26px), 88px);   /* all 5 previews fit the strip */
 }
 .thumb-item:hover   { border-color: var(--muted); }
 .thumb-item.active  { border-color: var(--accent); }
 .thumb-img {
   display: block;
-  flex: 1;           /* fill item height minus label */
-  min-height: 0;
   width: 100%;
-  object-fit: fill;
+  height: auto;      /* scale with the width, preserving aspect ratio */
   image-rendering: pixelated;
 }
 .thumb-label {
@@ -307,14 +318,65 @@ main {
 
 /* View hint bar below image */
 .view-hint-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   color: var(--muted);
   padding: 5px 12px;
   border-top: 1px solid var(--border);
   background: var(--bg);
-  min-height: 24px;
+  min-height: 40px;    /* room for two lines, so switching views doesn't shift the layout */
   line-height: 1.4;
+  width: 0;            /* never widen the panel: wrap to the image width instead */
+  min-width: 100%;
 }
+#view-hint { flex: 1; min-width: 0; }
+/* Circled "i": opens the layer derivation panel */
+.info-btn {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  background: none;
+  color: var(--muted);
+  font: italic 700 11px/1 Georgia, serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.info-btn:hover, .info-btn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.layer-info {
+  position: absolute;
+  left: 8px;
+  bottom: calc(100% + 6px);
+  width: min(520px, calc(100% - 16px));
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  z-index: 20;
+}
+.layer-info[hidden] { display: none; }
+.layer-info h4 { font-size: 13px; margin-bottom: 6px; }
+.layer-info p  { margin: 0 0 8px; }
+.layer-info p:last-child { margin-bottom: 0; }
+.layer-info ul { margin: 0 0 8px 18px; }
+.layer-info li { margin-bottom: 4px; }
+.layer-info code { font-size: 11px; }
+.layer-info table { border-collapse: collapse; margin: 4px 0 8px; font-size: 11px; }
+.layer-info th, .layer-info td { border: 1px solid var(--border); padding: 2px 8px; text-align: left; }
+.layer-info th { color: var(--muted); font-weight: 600; }
 
 /* ── Location map ─────────────────────────────────────────────────────── */
 #location-map {
@@ -400,6 +462,11 @@ main {
 }
 .poly-toggle-all:hover { color: var(--text); }
 .empty-poly  { color: var(--muted); font-size: 14px; font-style: italic; }
+/* Panel matches the window height; the "How to label" list scrolls so the
+   map, polygon list and Submit button always stay on screen */
+.controls-panel { max-height: var(--panel-max-h, none); }
+.howto-section { flex: 1 1 auto; min-height: 60px; display: flex; flex-direction: column; }
+.howto-section .instructions { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .controls-panel .btn-sm { font-size: 14px; padding: 8px 12px; }
 .controls-panel .btn-full { font-size: 16px; padding: 12px; }
 
@@ -460,111 +527,44 @@ footer .footer-sep { color: var(--border); }
 .loading-text { color: var(--muted); font-size: 13px; }
 
 /* ── Colormap range slider ────────────────────────────────────────────── */
-.colorbar-control {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  margin-left: auto;
-  flex-shrink: 0;
-  width: 98px;
-  gap: 2px;
+.erase-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.erase-btn:hover  { border-color: #ff9f0a; color: #ff9f0a; }
+.erase-btn.active { background: #ff9f0a; border-color: #ff9f0a; color: #1c1c1e; }
+#canvas.erasing   { cursor: cell; }
+.snap-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
   user-select: none;
 }
-.colorbar-control.cb-disabled {
-  opacity: 0.22;
-  pointer-events: none;
-}
-.colorbar-label-text {
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+.snap-toggle input { accent-color: var(--accent); cursor: pointer; }
+.cloud-toggle {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   color: var(--muted);
-  text-align: center;
-  line-height: 1;
-}
-.cb-vals-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  font-family: monospace;
-  color: var(--text);
-  line-height: 1.1;
-}
-/* Track + hanging triangle thumbs */
-.range-wrap {
-  position: relative;
-  width: 100%;
-  height: 20px;
-  overflow: visible;
-  flex-shrink: 0;
-}
-.range-track-bg {
-  position: absolute;
-  top: 5px;
-  left: 0;
-  height: 3px;
-  width: 100%;
-  background: var(--border);
-  border-radius: 2px;
-  pointer-events: none;
-}
-.range-track-fill {
-  position: absolute;
-  top: 5px;
-  height: 3px;
-  background: var(--accent);
-  border-radius: 2px;
-  pointer-events: none;
-  left: 0;
-  width: 100%;
-}
-.range-wrap input[type="range"] {
-  position: absolute;
-  width: 100%;
-  top: 0;
-  height: 14px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-  pointer-events: none;
-  margin: 0;
-  padding: 0;
-}
-.range-wrap input[type="range"]:focus { outline: none; }
-.range-wrap input[type="range"]::-webkit-slider-runnable-track {
-  background: transparent;
-  height: 3px;
-}
-.range-wrap input[type="range"]::-moz-range-track {
-  background: transparent;
-  height: 3px;
-  border: none;
-}
-/* Downward-pointing triangle thumbs — flat top on track, point below */
-.range-wrap input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 11px;
-  height: 11px;
-  background: var(--accent);
-  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
   cursor: pointer;
-  pointer-events: all;
-  margin-top: 6px;
-  border: none;
-  border-radius: 0;
+  user-select: none;
 }
-.range-wrap input[type="range"]::-moz-range-thumb {
-  width: 11px;
-  height: 11px;
-  background: var(--accent);
-  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
-  cursor: pointer;
-  pointer-events: all;
-  border: none;
-  border-radius: 0;
+.cloud-toggle.available { display: inline-flex; }
+.cloud-toggle input { accent-color: #5ac8fa; cursor: pointer; }
+.cloud-toggle .swatch {
+  width: 10px; height: 10px; border-radius: 2px;
+  background: rgba(90, 200, 250, 0.55);
 }
-
 /* ── Instructions screen ──────────────────────────────────────────────── */
 #instructions {
   display: none;
@@ -791,30 +791,27 @@ footer .footer-sep { color: var(--border); }
         <span class="scene-instr" id="scene-instr">—</span>
         <span class="scene-loc"   id="scene-loc">—</span>
         <span class="badge"       id="scene-badge"></span>
-        <!-- Colormap range slider (grayed out for RGB) -->
-        <div class="colorbar-control cb-disabled" id="colorbar-control">
-          <span class="colorbar-label-text">Range</span>
-          <div class="cb-vals-row">
-            <span id="cb-vmin-val">—</span>
-            <span id="cb-vmax-val">—</span>
-          </div>
-          <div class="range-wrap" id="range-wrap">
-            <div class="range-track-bg"></div>
-            <div class="range-track-fill" id="range-track-fill"></div>
-            <input type="range" id="cb-slider-a" oninput="onColorbarChange()">
-            <input type="range" id="cb-slider-b" oninput="onColorbarChange()">
-          </div>
-        </div>
+        <button class="erase-btn" id="erase-btn" onclick="setEraseMode(!eraseMode)" aria-pressed="false"
+                title="Eraser (E): outline part of a polygon to remove it">Eraser</button>
+        <label class="snap-toggle" title="Snap polygon edges to image pixel boundaries">
+          <input type="checkbox" id="snap-toggle-input" checked onchange="snapToPixels = this.checked">
+          Snap to pixels
+        </label>
+        <label class="cloud-toggle" id="cloud-toggle" title="Tint cloud and cloud-shadow pixels on every view">
+          <input type="checkbox" id="cloud-toggle-input" onchange="toggleCloudOverlay(this.checked)">
+          <span class="swatch"></span> Cloud overlay
+        </label>
       </div>
 
       <div class="image-area">
         <!-- Main drawing canvas -->
         <div class="canvas-wrapper" id="canvas-wrapper">
           <canvas id="canvas"></canvas>
+          <div class="hires-map" id="hires-map"></div>
           <div class="canvas-overlay-msg" id="canvas-msg"></div>
         </div>
 
-        <!-- Thumbnail strip (6 views, no polygon overlay) -->
+        <!-- Thumbnail strip (5 views, no polygon overlay) -->
         <div class="thumb-strip" id="thumb-strip">
           <div class="thumb-item active" data-view="rgb"    onclick="switchView('rgb')">
             <img class="thumb-img" id="thumb-rgb" alt="RGB">
@@ -824,22 +821,28 @@ footer .footer-sep { color: var(--border); }
             <img class="thumb-img" id="thumb-zscore" alt="Methane">
             <span class="thumb-label">Methane</span>
           </div>
-          <div class="thumb-item" data-view="dr"     onclick="switchView('dr')">
-            <img class="thumb-img" id="thumb-dr" alt="dR">
-            <span class="thumb-label">dR</span>
-          </div>
           <div class="thumb-item" data-view="ndvi"   onclick="switchView('ndvi')">
             <img class="thumb-img" id="thumb-ndvi" alt="NDVI">
             <span class="thumb-label">NDVI</span>
           </div>
-          <div class="thumb-item" data-view="cloud"  onclick="switchView('cloud')">
-            <img class="thumb-img" id="thumb-cloud" alt="Cloud">
-            <span class="thumb-label">Cloud</span>
+          <div class="thumb-item" data-view="hires" onclick="switchView('hires')">
+            <img class="thumb-img" id="thumb-hires" alt="High-resolution basemap">
+            <span class="thumb-label">Hi-res</span>
+          </div>
+          <div class="thumb-item" data-view="cloudmask" onclick="switchView('cloudmask')" style="display:none">
+            <img class="thumb-img" id="thumb-cloudmask" alt="Cloud mask">
+            <span class="thumb-label">Mask</span>
           </div>
         </div>
       </div>
 
-      <div class="view-hint-bar" id="view-hint">True-colour composite (Red / Green / Blue)</div>
+      <div class="view-hint-bar" id="view-hint-bar">
+        <span id="view-hint">True-colour composite (Red / Green / Blue)</span>
+        <button class="info-btn" id="info-btn" onclick="toggleLayerInfo()"
+                title="How this layer is calculated" aria-label="How this layer is calculated"
+                aria-expanded="false" aria-controls="layer-info">i</button>
+        <div class="layer-info" id="layer-info" role="dialog" aria-label="Layer details" hidden></div>
+      </div>
     </div>
 
     <!-- Right: controls -->
@@ -850,16 +853,18 @@ footer .footer-sep { color: var(--border); }
         <div id="location-map"></div>
       </div>
 
-      <div>
+      <div class="howto-section">
         <div class="section-title">How to label</div>
         <div class="instructions">
           <ul>
-            <li><strong>Click</strong> to place polygon vertices</li>
+            <li><strong>Click</strong> to place polygon vertices, or <strong>click and drag</strong> to draw a freehand outline</li>
+            <li>With <strong>Snap to pixels</strong> on, outlines follow the image pixel edges</li>
             <li><strong>Double-click</strong> or click the first vertex ●&nbsp;to close</li>
             <li>Draw <strong>multiple polygons</strong> for multiple plumes</li>
             <li>Click a thumbnail to switch the active view</li>
             <li><span class="key">Esc</span> cancels the polygon in progress</li>
             <li><span class="key">H</span> hides/shows drawn polygons</li>
+            <li><strong>Eraser</strong> (<span class="key">E</span>): outline the part of a polygon to remove; <strong>Undo</strong> reverses it</li>
           </ul>
         </div>
       </div>
@@ -875,7 +880,7 @@ footer .footer-sep { color: var(--border); }
         <button class="btn btn-ghost btn-sm"
                 style="margin-top:8px;width:100%"
                 onclick="undoLast()" id="btn-undo" disabled>
-          ↩ Undo last polygon
+          ↩ Undo
         </button>
       </div>
 
@@ -924,19 +929,33 @@ footer .footer-sep { color: var(--border); }
     <p>Click the thumbnails to the right of the main image to switch views. Your polygons stay in place when you switch, so you can check one outline against several views.</p>
     <table class="view-table">
       <tr><td>RGB</td><td>True-colour image. Use it to see the surface: facilities, roads, fields, water, clouds.</td></tr>
-      <tr><td>Methane</td><td>Methane signal compared with the same-year background. Red means unusually strong SWIR absorption, which is where plumes usually show up.</td></tr>
-      <tr><td>dR</td><td>Raw methane proxy, (SWIR1 &minus; SWIR2) / (SWIR1 + SWIR2). Red means positive dR (possible absorption).</td></tr>
-      <tr><td>NDVI</td><td>Vegetation index (tan = bare soil, green = vegetation). Use it to check whether a methane-view feature just follows a land-cover edge.</td></tr>
-      <tr><td>Cloud</td><td>Approximate cloud likelihood. Light gray areas are probably cloudy, and clouds can cause false methane signals.</td></tr>
+      <tr><td>Methane</td><td>Methane signal: how unusual this image's shortwave-infrared band ratio (dR) is compared with the same place on other dates that year. Red means more methane-like absorption than usual, which is where plumes show up. Things that changed on the ground (new pads, ponds, wet soil, crops, cloud shadows) can also turn red, so look for a plume shape and check red features against RGB and Hi-res.</td></tr>
+      <tr><td>NDVI</td><td>Vegetation index (light grey = bare ground, green = vegetation). Use it to check whether a red Methane feature just follows a field or other vegetation edge.</td></tr>
+      <tr><td>Hi-res</td><td>High-resolution basemap (Esri World Imagery) of the same area, for identifying surface features. Scroll to zoom and drag to pan. Keep in mind:
+    <ul>
+      <li><strong>Not from the scene date.</strong> The basemap is a mosaic of images from different dates, often
+      years apart from the satellite scene. Pads, ponds, roads and other facilities may have been built,
+      removed or changed since.</li>
+      <li><strong>Approximate position.</strong> The scene is on a UTM grid and the basemap on a web map
+      projection, so the scene outline (dashed) and your polygons can be offset by up to a few tens of
+      metres, about one or two image pixels, mostly near the edges.</li>
+      <li><strong>Resolution varies.</strong> About 0.3&ndash;1 m in most places, coarser in some remote areas.
+      Zooming in past the available detail shows a "Map data not yet available" tile.</li>
+      <li><strong>Context only.</strong> Methane cannot be seen in it. Use it to identify surface features
+      (pads, tanks, pits, roads, fields) that could explain a red Methane feature. You cannot draw on this view;
+      your polygons are shown as outlines.</li>
+    </ul></td></tr>
+      <tr><td>Mask</td><td>Cloud mask from the satellite product, shown only when available. Light areas are flagged as cloud or cloud shadow. Tick <strong>Cloud overlay</strong> above the image to tint those pixels on every view.</td></tr>
     </table>
-    <p>Use the <strong>Range</strong> slider above the image to adjust the color stretch in the Methane and dR views.</p>
+    <p>Click the <strong>&#9432;</strong> button under the image to see how the current layer is calculated.</p>
 
     <h3>Drawing polygons</h3>
     <ol>
-      <li><strong>Click</strong> on the image to place each corner of the polygon.</li>
+      <li><strong>Click</strong> on the image to place each corner of the polygon, or <strong>click and drag</strong> to trace the plume outline freehand. Releasing the mouse closes a freehand outline. With <strong>Snap to pixels</strong> (on by default), each finished outline is redrawn along the edges of the image pixels it covers.</li>
       <li><strong>Double-click</strong>, or click the first corner again, to close the polygon.</li>
       <li>Draw a <strong>separate polygon for each plume</strong> if there is more than one.</li>
-      <li>Press <span class="key">Esc</span> to cancel a polygon you are still drawing, or click <strong>Undo last polygon</strong> to remove the last one.</li>
+      <li>To trim a polygon, turn on <strong>Eraser</strong> (above the image, or press <span class="key">E</span>) and outline the part to remove, by clicking or dragging as when drawing. The erased pixels are removed from every visible polygon. Erase from the edge: a hole in the middle of a polygon is not allowed. Press <span class="key">E</span> again to go back to drawing.</li>
+      <li>Press <span class="key">Esc</span> to cancel an outline you are still drawing, or click <strong>Undo</strong> to reverse the last change (a new polygon, an erase or a delete).</li>
     </ol>
 
     <h3>Examples</h3>
@@ -987,16 +1006,81 @@ footer .footer-sep { color: var(--border); }
 
 <script>
 // ── Constants ───────────────────────────────────────────────────────────
-const VIEWS = ['rgb', 'zscore', 'dr', 'ndvi', 'cloud'];
+const VIEWS = ['rgb', 'zscore', 'ndvi', 'hires', 'cloudmask'];
 const VIEW_HINTS = {
   rgb:    'True-colour composite (Red / Green / Blue)',
-  zscore: 'Methane proxy: dR vs. same-year background — red = anomalously high SWIR absorption, likely methane plume',
-  dr:     'dR = (SWIR1−SWIR2)/(SWIR1+SWIR2) — raw methane proxy; red = positive dR (potential absorption)',
-  ndvi:   'NDVI = (NIR−Red)/(NIR+Red) — vegetation index (tan = bare soil, green = vegetation)',
-  cloud:  'Approximate cloud likelihood (visible-band brightness) — light grey regions are likely cloudy',
+  zscore: 'Methane = dR on this date vs. the same pixel on other dates that year — red = unusually strong SWIR2 absorption, possible methane',
+  ndvi:   'NDVI = (NIR−Red)/(NIR+Red) — vegetation index (light grey = bare ground, green = vegetation)',
+  hires:  'High-resolution basemap (Esri World Imagery) — context only, NOT from the scene date; scroll to zoom, drag to pan',
+  cloudmask: 'Cloud mask from the satellite product (Cloud Score+ / Landsat QA) — light = cloud or shadow',
 };
+// Shown by the (i) button under the image: how each layer is calculated
+const BAND_TABLE = (rows) => `<table><tr><th></th><th>Sentinel-2</th><th>Landsat 8/9</th><th>Landsat 4/5</th></tr>${
+  rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table>`;
+const SOURCE_NOTE = `<p>All layers use top-of-atmosphere reflectance from Google Earth Engine at each sensor's native
+  resolution (Sentinel-2 20 m, Landsat 30 m). Sentinel-2 and Landsat 4/5 reflectances are adjusted to match
+  Landsat 8/9 using the cross-sensor regressions of Chastain et al. (2019).</p>`;
+const VIEW_INFO = {
+  rgb: `<h4>RGB (true colour)</h4>
+    <p>Red, green and blue reflectance shown as an ordinary colour photo. Each band is stretched separately
+    between its 2nd and 98th percentile in this scene, so contrast is comparable between scenes.</p>
+    ${BAND_TABLE([['Red', 'B4', 'B4', 'B3'], ['Green', 'B3', 'B3', 'B2'], ['Blue', 'B2', 'B2', 'B1']])}${SOURCE_NOTE}`,
+  zscore: `<h4>Methane (dR anomaly vs. same-year background)</h4>
+    <p>First the band ratio <code>dR = (SWIR1 &minus; SWIR2) / (SWIR1 + SWIR2)</code> is calculated for every
+    acquisition of this site.</p>
+    ${BAND_TABLE([['SWIR1 (~1.6 &micro;m)', 'B11', 'B6', 'B5'], ['SWIR2 (~2.2 &micro;m)', 'B12', 'B7', 'B7']])}
+    <p>Methane absorbs sunlight much more strongly in the SWIR2 band than in SWIR1, so under a plume SWIR2 is darker
+    and dR goes up. The ground has its own dR too, so each pixel is compared with the same pixel on the site's
+    other acquisitions from the same year:</p>
+    <p><code>Methane = (dR(this date) &minus; mean dR) / standard deviation of dR</code>, with the mean and standard
+    deviation taken per pixel over the other same-year acquisitions (all years if there are fewer than 5).
+    Cloudy pixels (cloud mask) in those other acquisitions are left out, and pixels with fewer than 3 clear
+    background values are left blank.</p>
+    <p>The colour range is fixed at &plusmn;3 standard deviations: red means dR is unusually high for that pixel
+    (methane-like absorption), blue unusually low, white typical.</p>
+    <p>Anything that changed on the ground compared with the rest of the year (new pads or ponds, wet soil after
+    rain, crops, flare smoke, cloud shadows) also shows up. Pixels that barely vary during the year can turn red or blue
+    from small changes, so look for a coherent plume shape (a diffuse streak or fan from a point) that does not match
+    anything in RGB or Hi-res, rather than isolated red pixels.</p>${SOURCE_NOTE}`,
+  ndvi: `<h4>NDVI (vegetation index)</h4>
+    <p><code>NDVI = (NIR &minus; Red) / (NIR + Red)</code>, shown from 0 (light grey, bare ground) to 0.8 (green,
+    dense vegetation).</p>
+    ${BAND_TABLE([['NIR', 'B8', 'B5', 'B4'], ['Red', 'B4', 'B4', 'B3']])}
+    <p>Use it to check whether a red Methane feature just follows a field or other vegetation edge.</p>${SOURCE_NOTE}`,
+  hires: `<h4>Hi-res basemap (Esri World Imagery)</h4>
+    <p>A high-resolution aerial/satellite basemap loaded live from Esri for the same area as the scene. Scroll
+    to zoom and drag to pan. It opens at the same scale and extent as the other layers; the dashed square is the
+    scene's footprint.</p>
+    <ul>
+      <li><strong>Not from the scene date.</strong> The basemap is a mosaic of images from different dates, often
+      years apart from the satellite scene. Pads, ponds, roads and other facilities may have been built,
+      removed or changed since.</li>
+      <li><strong>Approximate position.</strong> The scene is on a UTM grid and the basemap on a web map
+      projection, so the scene outline (dashed) and your polygons can be offset by up to a few tens of
+      metres, about one or two image pixels, mostly near the edges.</li>
+      <li><strong>Resolution varies.</strong> About 0.3&ndash;1 m in most places, coarser in some remote areas.
+      Zooming in past the available detail shows a "Map data not yet available" tile.</li>
+      <li><strong>Context only.</strong> Methane cannot be seen in it. Use it to identify surface features
+      (pads, tanks, pits, roads, fields) that could explain a red Methane feature. You cannot draw on this view;
+      your polygons are shown as outlines.</li>
+    </ul>
+    <p>Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community. Tiles are displayed, not stored.</p>`,
+  cloudmask: `<h4>Cloud mask</h4>
+    <p>Pixels flagged as cloud or cloud shadow by the satellite product are light, clear pixels dark.</p>
+    <p><b>Sentinel-2:</b> Cloud Score+ (<code>cs_cdf</code> below 0.60, Google's recommended threshold).<br>
+    <b>Landsat:</b> USGS CFMask <code>QA_PIXEL</code> bits 1&ndash;4 (dilated cloud, cirrus, cloud, cloud shadow).</p>
+    <p>Images with more than half of their pixels flagged are not shown for labeling. Tick <b>Cloud overlay</b>
+    to tint flagged pixels on every layer. Clouds and their shadows can create false Methane features.</p>`,
+};
+
 const POLY_COLORS  = ['#ff453a','#30d158','#0a84ff','#ff9f0a','#bf5af2','#5ac8fa','#ff6b81','#4cd964'];
 const CLOSE_RADIUS = 12;
+const ERASE_COLOR  = '#ff9f0a';   // eraser outline (orange)
+const MIN_DISPLAY_BOX = 320; // smallest image area (px); below this the page scrolls
+const MAX_DISPLAY_BOX = 900; // largest image area (px), for big monitors
+const DRAG_START_PX = 5;     // movement before a press becomes a freehand drag
+const FREEHAND_STEP = 2;     // min spacing (display px) between recorded freehand points
+const SIMPLIFY_PX   = 1.5;   // Douglas-Peucker tolerance for freehand outlines (display px)
 
 // ── State ───────────────────────────────────────────────────────────────
 let userId         = null;
@@ -1005,10 +1089,19 @@ let activeView     = 'rgb';
 let imageCache     = {};     // view → HTMLImageElement
 let completedPolys = [];     // [[{x,y},...], ...]  display coords
 let polyVisible    = [];     // parallel to completedPolys: true = drawn on canvas
+let pressStart     = null;   // mousedown point while a freehand drag may start
+let freehandActive = false;  // true while drawing a freehand outline
+let suppressClick  = false;  // swallow the click that ends a freehand drag
+let snapToPixels   = true;   // replace closed polygons with their pixel-boundary outline
 let currentPoly    = [];
+let eraseMode      = false;  // outlines remove pixels from polygons instead of adding one
+let polyHistory    = [];     // snapshots of {polys, vis} before each change, for Undo
 let mousePos       = {x: 0, y: 0};
 let noPlume        = false;
 let labelCount     = 0;
+let showCloudOverlay = false;  // user preference, kept across scenes
+let cloudOverlayImg  = null;   // per-scene RGBA overlay (null if no cloud mask)
+let displayBox       = 0;      // side of the square image area (px), fitted to the window
 
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
@@ -1087,7 +1180,6 @@ async function loadNextScene() {
 
     currentScene = data;
     imageCache   = {};
-    initColorbar(data.view_ranges || {});
 
     // Pre-load all view images
     for (const [view, src] of Object.entries(data.images)) {
@@ -1097,10 +1189,18 @@ async function loadNextScene() {
       imageCache[view] = img;
     }
 
-    canvas.width  = data.img_width;
-    canvas.height = data.img_height;
-    // Lock thumb strip to canvas height so they align exactly
-    document.getElementById('thumb-strip').style.height = data.img_height + 'px';
+    cloudOverlayImg = null;
+    if (data.cloud_overlay) {
+      const ov = new Image();
+      ov.src   = data.cloud_overlay;
+      await new Promise(r => { ov.onload = r; ov.onerror = r; });
+      cloudOverlayImg = ov;
+    }
+    document.getElementById('cloud-toggle').classList.toggle('available', !!cloudOverlayImg);
+
+    // Scale the scene to fit the image area (keeps aspect ratio)
+    fitDisplayBox();
+    sizeCanvas();
 
     // Update scene metadata
     document.getElementById('scene-date').textContent  = data.date;
@@ -1114,6 +1214,8 @@ async function loadNextScene() {
       badge.textContent = 'Random';        badge.className = 'badge badge-rand';
     }
 
+    document.getElementById('thumb-hires').src = hiresThumbUrl(data);
+    if (activeView !== 'hires' && !imageCache[activeView]) activeView = 'rgb';   // e.g. no cloud mask in this scene
     updateThumbnails();
     switchView(activeView);
     updateMap(data.clat, data.clon);
@@ -1128,31 +1230,117 @@ function formatInstr(key) {
   return {landsat_45:'Landsat 4/5', landsat_89:'Landsat 8/9', sentinel2:'Sentinel-2'}[key] || key;
 }
 
+// ── Image area sizing ───────────────────────────────────────────────────
+// The image area is the largest square that fits the window beside the
+// thumbnail strip and controls panel, so the whole labeler fits on screen.
+function fitDisplayBox() {
+  const strip   = document.getElementById('thumb-strip');
+  const main    = document.querySelector('main');
+  const cs      = getComputedStyle(main);
+  const padX    = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.columnGap || 0);
+  const padY    = parseFloat(cs.paddingTop)  + parseFloat(cs.paddingBottom);
+  const availW  = window.innerWidth - padX - strip.offsetWidth
+                - document.querySelector('.controls-panel').offsetWidth - 4;   // 4 = panel borders
+  const chromeH = document.querySelector('header').offsetHeight
+                + (document.querySelector('#app > footer')?.offsetHeight || 0);   // page header + footer
+  const availH  = window.innerHeight - padY - chromeH
+                - document.querySelector('.scene-meta').offsetHeight
+                - document.getElementById('view-hint-bar').offsetHeight - 4;
+  displayBox = Math.round(Math.min(MAX_DISPLAY_BOX, Math.max(MIN_DISPLAY_BOX, Math.min(availW, availH))));
+  document.documentElement.style.setProperty('--display-box', displayBox + 'px');
+  const panelH = window.innerHeight - padY - chromeH - 2;
+  document.documentElement.style.setProperty('--panel-max-h', Math.max(panelH, 420) + 'px');
+}
+
+// Size the canvas for the current scene; polygons are kept in display
+// coordinates, so rescale any already drawn when the size changes.
+function sizeCanvas() {
+  if (!currentScene) return;
+  const fit  = displayBox / Math.max(currentScene.orig_width, currentScene.orig_height);
+  const newW = Math.round(currentScene.orig_width * fit);
+  if (canvas.width && newW !== canvas.width) {
+    const k = newW / canvas.width;
+    const scale = poly => poly.forEach(p => { p.x *= k; p.y *= k; });
+    completedPolys.forEach(scale);
+    polyHistory.forEach(h => h.polys.forEach(scale));
+    scale(currentPoly);
+  }
+  canvas.width  = newW;
+  canvas.height = Math.round(currentScene.orig_height * fit);
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!currentScene) return;
+    fitDisplayBox();
+    sizeCanvas();
+    if (activeView === 'hires') showHiresMap();
+    redraw();
+  }, 100);
+});
+
 // ── Thumbnails ──────────────────────────────────────────────────────────
 function updateThumbnails() {
   VIEWS.forEach(view => {
     const img = document.getElementById(`thumb-${view}`);
     if (img && imageCache[view]) img.src = imageCache[view].src;
     const item = document.querySelector(`.thumb-item[data-view="${view}"]`);
-    if (item) item.classList.toggle('active', view === activeView);
+    if (item) {
+      item.classList.toggle('active', view === activeView);
+      if (view === 'cloudmask') item.style.display = imageCache[view] ? '' : 'none';
+    }
   });
 }
 
 // ── View switching ──────────────────────────────────────────────────────
 function switchView(view) {
-  if (!imageCache[view]) return;
+  if (view !== 'hires' && !imageCache[view]) return;
   activeView = view;
   document.getElementById('view-hint').textContent = VIEW_HINTS[view] || '';
+  if (!document.getElementById('layer-info').hidden) showLayerInfo();
+  if (view === 'hires') showHiresMap(); else hideHiresMap();
   updateThumbnails();
-  updateColorbarForView(view);
   redraw();
 }
 
+// ── Layer info panel ────────────────────────────────────────────────────
+function showLayerInfo() {
+  document.getElementById('layer-info').innerHTML = VIEW_INFO[activeView] || '';
+}
+function toggleLayerInfo(force) {
+  const panel = document.getElementById('layer-info');
+  const open  = force !== undefined ? force : panel.hidden;
+  if (open) showLayerInfo();
+  panel.hidden = !open;
+  document.getElementById('info-btn').setAttribute('aria-expanded', String(open));
+}
+document.addEventListener('keydown', e => {   // Escape closes the panel without cancelling a polygon
+  if (e.key === 'Escape' && !document.getElementById('layer-info').hidden) {
+    toggleLayerInfo(false);
+    e.stopImmediatePropagation();
+  }
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#layer-info, #info-btn')) toggleLayerInfo(false);
+});
+
 // ── Canvas drawing ──────────────────────────────────────────────────────
+function toggleCloudOverlay(on) {
+  showCloudOverlay = on;
+  redraw();
+}
+
 function redraw() {
+  if (activeView === 'hires') { drawHiresOverlays(); return; }
   if (!imageCache[activeView]) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(imageCache[activeView], 0, 0);
+  ctx.imageSmoothingEnabled = false;   // keep native pixels crisp when scaling
+  ctx.drawImage(imageCache[activeView], 0, 0, canvas.width, canvas.height);
+  if (showCloudOverlay && cloudOverlayImg && activeView !== 'cloudmask') {
+    ctx.drawImage(cloudOverlayImg, 0, 0, canvas.width, canvas.height);
+  }
 
   // Completed polygons
   completedPolys.forEach((poly, i) => {
@@ -1168,13 +1356,30 @@ function redraw() {
     ctx.lineWidth   = 2;
     ctx.setLineDash([]);
     ctx.stroke();
-    poly.forEach(p => {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-    });
+    if (poly.length <= 12) {        // skip dots on snapped / freehand outlines
+      poly.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+      });
+    }
   });
+
+  // In-progress freehand outline (eraser outlines are orange and shaded)
+  const drawCol = eraseMode ? ERASE_COLOR : '#ffffff';
+  if (freehandActive && currentPoly.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(currentPoly[0].x, currentPoly[0].y);
+    currentPoly.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    if (eraseMode) { ctx.fillStyle = ERASE_COLOR + '40'; ctx.fill(); }
+    ctx.strokeStyle = drawCol;
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash(eraseMode ? [5, 4] : []);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
 
   // In-progress polygon
   if (currentPoly.length > 0) {
@@ -1183,7 +1388,7 @@ function redraw() {
     currentPoly.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
     ctx.lineTo(mousePos.x, mousePos.y);
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = drawCol;
     ctx.lineWidth   = 1.5;
     ctx.stroke();
     ctx.setLineDash([]);
@@ -1191,7 +1396,7 @@ function redraw() {
     currentPoly.forEach((p, i) => {
       ctx.beginPath();
       ctx.arc(p.x, p.y, i === 0 ? 6 : 4, 0, Math.PI * 2);
-      ctx.fillStyle   = i === 0 ? '#ffff00' : '#ffffff';
+      ctx.fillStyle   = i === 0 ? '#ffff00' : drawCol;
       ctx.strokeStyle = '#00000088';
       ctx.lineWidth   = 1;
       ctx.fill();
@@ -1218,20 +1423,75 @@ function canvasPoint(e) {
   return {x: e.clientX - rect.left, y: e.clientY - rect.top};
 }
 
+// Douglas-Peucker simplification of a point list
+function simplifyPath(pts, eps) {
+  if (pts.length < 3) return pts;
+  const a = pts[0], b = pts[pts.length - 1];
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1e-9;
+  let maxD = -1, idx = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const d = Math.abs((b.x - a.x) * (a.y - pts[i].y) - (a.x - pts[i].x) * (b.y - a.y)) / len;
+    if (d > maxD) { maxD = d; idx = i; }
+  }
+  if (maxD <= eps) return [a, b];
+  return simplifyPath(pts.slice(0, idx + 1), eps).slice(0, -1)
+    .concat(simplifyPath(pts.slice(idx), eps));
+}
+
+// Simplify a closed outline: split it at the point farthest from the start, so
+// an outline that ends where it began is not collapsed to its two end points
+function simplifyLoop(pts, eps) {
+  if (pts.length < 4) return pts;
+  let far = 1;
+  pts.forEach((p, i) => { if (dist(p, pts[0]) > dist(pts[far], pts[0])) far = i; });
+  return simplifyPath(pts.slice(0, far + 1), eps).slice(0, -1)
+    .concat(simplifyPath(pts.slice(far), eps));
+}
+
+// Press-and-drag draws a freehand outline (only when no click-polygon is in progress)
+canvas.addEventListener('mousedown', e => {
+  if (!currentScene || e.button !== 0 || currentPoly.length > 0) return;
+  pressStart = canvasPoint(e);
+});
+
 canvas.addEventListener('mousemove', e => {
   mousePos = canvasPoint(e);
+  if (pressStart && (e.buttons & 1)) {
+    if (!freehandActive && dist(mousePos, pressStart) >= DRAG_START_PX) {
+      freehandActive = true;
+      currentPoly    = [pressStart];
+      if (!eraseMode) { noPlume = false; updateNoPlumeBtn(); }
+    }
+    if (freehandActive) {
+      if (dist(mousePos, currentPoly[currentPoly.length - 1]) >= FREEHAND_STEP) currentPoly.push(mousePos);
+      redraw();
+      return;
+    }
+  }
   if (currentPoly.length > 0) redraw();
 });
 
+document.addEventListener('mouseup', () => {
+  pressStart = null;
+  if (!freehandActive) return;
+  freehandActive = false;
+  suppressClick  = true;          // the click event fires right after mouseup
+  setTimeout(() => { suppressClick = false; }, 0);
+  const pts = simplifyLoop(currentPoly, SIMPLIFY_PX);
+  // drop a duplicated end point if the outline was closed by hand
+  if (pts.length > 3 && dist(pts[0], pts[pts.length - 1]) < FREEHAND_STEP) pts.pop();
+  currentPoly = pts;
+  closePoly();                    // < 3 points is discarded by closePoly
+});
+
 canvas.addEventListener('click', e => {
-  if (!currentScene) return;
+  if (!currentScene || suppressClick) return;
   const pt = canvasPoint(e);
   if (currentPoly.length >= 3 && dist(pt, currentPoly[0]) < CLOSE_RADIUS) {
     closePoly(); return;
   }
   currentPoly.push(pt);
-  noPlume = false;
-  updateNoPlumeBtn();
+  if (!eraseMode) { noPlume = false; updateNoPlumeBtn(); }
   redraw();
 });
 
@@ -1243,28 +1503,187 @@ canvas.addEventListener('dblclick', e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { currentPoly = []; redraw(); }
+  if (e.key === 'Escape') { currentPoly = []; freehandActive = false; pressStart = null; redraw(); }
   if ((e.key === 'h' || e.key === 'H') && currentScene
       && !e.target.matches('input, textarea, select')) toggleAllPolys();
+  if ((e.key === 'e' || e.key === 'E') && currentScene
+      && !e.target.matches('input, textarea, select')) setEraseMode(!eraseMode);
 });
+
+// ── Pixel snapping ───────────────────────────────────────────────────────
+function pointInPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+// Image pixels (W*H, row-major) whose centres fall inside a display-space polygon.
+// A polygon too small to cover any pixel centre keeps the pixel under its centroid.
+function polyMask(poly) {
+  const W = currentScene.orig_width, H = currentScene.orig_height;
+  const sx = canvas.width / W, sy = canvas.height / H;
+  const mask = new Uint8Array(W * H);
+  const xs = poly.map(p => p.x), ys = poly.map(p => p.y);
+  const x0 = Math.max(0, Math.floor(Math.min(...xs) / sx)), x1 = Math.min(W - 1, Math.floor(Math.max(...xs) / sx));
+  const y0 = Math.max(0, Math.floor(Math.min(...ys) / sy)), y1 = Math.min(H - 1, Math.floor(Math.max(...ys) / sy));
+  if (x1 < x0 || y1 < y0) return mask;
+  let n = 0;
+  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) {
+    if (pointInPoly((i + 0.5) * sx, (j + 0.5) * sy, poly)) { mask[j * W + i] = 1; n++; }
+  }
+  if (n === 0) {
+    const cx = xs.reduce((a, b) => a + b) / xs.length, cy = ys.reduce((a, b) => a + b) / ys.length;
+    const i = Math.min(x1, Math.max(x0, Math.floor(cx / sx)));
+    const j = Math.min(y1, Math.max(y0, Math.floor(cy / sy)));
+    mask[j * W + i] = 1;
+  }
+  return mask;
+}
+
+// Outline(s) of a pixel mask as display-space polygons: one per connected blob
+// (pixels touching only at a corner become separate blobs; holes are dropped).
+function maskOutlines(mask) {
+  const w = currentScene.orig_width, h = currentScene.orig_height;
+  const sx = canvas.width / w, sy = canvas.height / h;
+  const x0 = 0, y0 = 0;
+  const f = (i, j) => i >= 0 && j >= 0 && i < w && j < h && mask[j * w + i] === 1;
+
+  // Directed boundary edges, clockwise on screen (filled pixel on the right)
+  const edges = [], outgoing = new Map();
+  const key = (i, j) => j * (w + 1) + i;
+  const addEdge = (ai, aj, bi, bj) => {
+    const e = {a: [ai, aj], b: [bi, bj], used: false};
+    edges.push(e);
+    const k = key(ai, aj);
+    if (!outgoing.has(k)) outgoing.set(k, []);
+    outgoing.get(k).push(e);
+  };
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    if (!f(i, j)) continue;
+    if (!f(i, j - 1)) addEdge(i, j, i + 1, j);
+    if (!f(i + 1, j)) addEdge(i + 1, j, i + 1, j + 1);
+    if (!f(i, j + 1)) addEdge(i + 1, j + 1, i, j + 1);
+    if (!f(i - 1, j)) addEdge(i, j + 1, i, j);
+  }
+
+  const loops = [];
+  for (const start of edges) {
+    if (start.used) continue;
+    const loop = [start.a];
+    start.used = true;
+    let cur = start;
+    for (let guard = 0; guard < edges.length; guard++) {
+      const v = cur.b;
+      if (v[0] === start.a[0] && v[1] === start.a[1]) break;
+      const cands = (outgoing.get(key(v[0], v[1])) || []).filter(e => !e.used);
+      if (!cands.length) break;
+      // At corner-touching pixels prefer a right turn, so blobs stay separate
+      const dx = cur.b[0] - cur.a[0], dy = cur.b[1] - cur.a[1];
+      const pref = [[-dy, dx], [dx, dy], [dy, -dx]];
+      let next = cands[0];
+      for (const [px, py] of pref) {
+        const hit = cands.find(e => e.b[0] - e.a[0] === px && e.b[1] - e.a[1] === py);
+        if (hit) { next = hit; break; }
+      }
+      loop.push(v);
+      next.used = true;
+      cur = next;
+    }
+    // Drop collinear vertices
+    const pts = loop.filter((p, k) => {
+      const a = loop[(k - 1 + loop.length) % loop.length], b = loop[(k + 1) % loop.length];
+      return (p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0]) !== 0;
+    });
+    let area = 0;
+    for (let k = 0; k < pts.length; k++) {
+      const a = pts[k], b = pts[(k + 1) % pts.length];
+      area += a[0] * b[1] - b[0] * a[1];
+    }
+    if (area > 0 && pts.length >= 4) {   // outer boundary (holes have negative area)
+      loops.push(pts.map(([i, j]) => ({x: (x0 + i) * sx, y: (y0 + j) * sy})));
+    }
+  }
+  return loops;
+}
+
+// Replace a display-space polygon with the outline(s) of the pixels it covers
+function snapPolygonToPixels(poly) {
+  return maskOutlines(polyMask(poly));
+}
 
 function closePoly() {
   if (currentPoly.length < 3) { currentPoly = []; redraw(); return; }
-  completedPolys.push([...currentPoly]);
-  polyVisible.push(true);
+  if (eraseMode) { eraseWith(currentPoly); return; }
+  saveHistory();
+  const polys = snapToPixels ? snapPolygonToPixels(currentPoly) : [[...currentPoly]];
+  polys.forEach(p => { completedPolys.push(p); polyVisible.push(true); });
   currentPoly = [];
   updatePolyList();
   redraw();
 }
 
+function saveHistory() {
+  polyHistory.push({polys: completedPolys.map(p => p.map(q => ({x: q.x, y: q.y}))), vis: [...polyVisible]});
+}
+
+// ── Eraser ──────────────────────────────────────────────────────────────
+// Removes the pixels inside the eraser outline from every visible polygon.
+// Erased polygons become pixel outlines; a polygon cut in two becomes two
+// polygons, and one erased completely is removed. Labels cannot contain
+// holes, so an erase that would leave a hole inside a polygon is refused.
+function setEraseMode(on) {
+  eraseMode = on;
+  currentPoly = []; freehandActive = false; pressStart = null;
+  const btn = document.getElementById('erase-btn');
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', String(on));
+  canvas.classList.toggle('erasing', on);
+  redraw();
+}
+
+function eraseWith(shape) {
+  currentPoly = [];
+  const cut = polyMask(shape);
+  const count = m => m.reduce((a, v) => a + v, 0);
+  const polys = [], vis = [];
+  let changed = false, holes = false;
+  completedPolys.forEach((poly, i) => {
+    const keep = () => { polys.push(poly); vis.push(polyVisible[i]); };
+    if (!polyVisible[i]) return keep();   // hidden polygons are left alone
+    const m = polyMask(poly);
+    let hit = false;
+    for (let k = 0; k < m.length; k++) if (m[k] && cut[k]) { m[k] = 0; hit = true; }
+    if (!hit) return keep();
+    const parts = maskOutlines(m);
+    const back  = new Uint8Array(m.length);
+    parts.forEach(p => polyMask(p).forEach((v, k) => { if (v) back[k] = 1; }));
+    if (count(back) !== count(m)) { holes = true; return keep(); }
+    changed = true;
+    parts.forEach(p => { polys.push(p); vis.push(true); });
+  });
+  if (changed) {
+    saveHistory();
+    completedPolys = polys;
+    polyVisible    = vis;
+    updatePolyList();
+  }
+  if (holes) showCanvasMsg('Can\'t erase a hole inside a polygon.\nErase from the polygon\'s edge instead.');
+  else if (!changed) showCanvasMsg('Nothing to erase there');
+  redraw();
+}
+
 function undoLast() {
-  if (currentPoly.length > 0) { currentPoly = []; }
-  else                         { completedPolys.pop(); polyVisible.pop(); }
+  if (currentPoly.length > 0)  { currentPoly = []; }
+  else if (polyHistory.length) { const h = polyHistory.pop(); completedPolys = h.polys; polyVisible = h.vis; }
   updatePolyList();
   redraw();
 }
 
 function deletePolygon(idx) {
+  saveHistory();
   completedPolys.splice(idx, 1);
   polyVisible.splice(idx, 1);
   updatePolyList();
@@ -1291,7 +1710,7 @@ function updatePolyList() {
   const empty   = document.getElementById('empty-poly-msg');
   const undoBtn = document.getElementById('btn-undo');
   document.getElementById('poly-count').textContent = `(${completedPolys.length})`;
-  undoBtn.disabled = completedPolys.length === 0 && currentPoly.length === 0;
+  undoBtn.disabled = polyHistory.length === 0 && currentPoly.length === 0;
   const toggleAll = document.getElementById('poly-toggle-all');
   toggleAll.style.display = completedPolys.length ? '' : 'none';
   toggleAll.textContent   = polyVisible.some(v => v) ? 'Hide all' : 'Show all';
@@ -1320,7 +1739,7 @@ function updatePolyList() {
 // ── No-plume toggle ─────────────────────────────────────────────────────
 function toggleNoPlume() {
   noPlume = !noPlume;
-  if (noPlume) { completedPolys = []; polyVisible = []; currentPoly = []; updatePolyList(); redraw(); }
+  if (noPlume) { completedPolys = []; polyVisible = []; currentPoly = []; polyHistory = []; updatePolyList(); redraw(); }
   updateNoPlumeBtn();
 }
 function updateNoPlumeBtn() {
@@ -1363,7 +1782,82 @@ async function submitLabel() {
   }
 }
 
+// ── Hi-res basemap view ─────────────────────────────────────────────────
+// Esri World Imagery, loaded live (display only, nothing is stored). The scene
+// chip is a UTM square; its lat/lon box here is a local approximation, good to
+// a few tens of metres, which is plenty for context.
+const ESRI_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer';
+const ESRI_ATTRIB  = 'Imagery &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community';
+let hiresMap = null, hiresLayer = null;
+
+function chipBounds(scene) {
+  const halfX = scene.orig_width  * scene.resolution / 2;
+  const halfY = scene.orig_height * scene.resolution / 2;
+  const phi   = scene.clat * Math.PI / 180;   // metres per degree on the WGS84 ellipsoid
+  const mLat  = 111132.92 - 559.82 * Math.cos(2 * phi) + 1.175 * Math.cos(4 * phi);
+  const mLon  = 111412.84 * Math.cos(phi) - 93.5 * Math.cos(3 * phi);
+  const dLat  = halfY / mLat;
+  const dLon  = halfX / mLon;
+  return [[scene.clat - dLat, scene.clon - dLon], [scene.clat + dLat, scene.clon + dLon]];
+}
+
+function displayToLatLng(p) {
+  const [[s, w], [n, e]] = chipBounds(currentScene);
+  return [n - p.y / canvas.height * (n - s), w + p.x / canvas.width * (e - w)];
+}
+
+function hiresThumbUrl(scene) {
+  const [[s, w], [n, e]] = chipBounds(scene);
+  return `${ESRI_IMAGERY}/export?bbox=${w},${s},${e},${n}&bboxSR=4326&imageSR=3857&size=256,256&format=jpg&f=image`;
+}
+
+function showHiresMap() {
+  const el = document.getElementById('hires-map');
+  canvas.style.display = 'none';
+  el.style.display = 'block';
+  el.style.width   = canvas.width  + 'px';
+  el.style.height  = canvas.height + 'px';
+  if (!hiresMap) {
+    // zoomSnap 0 lets the map open exactly on the scene footprint (same scale as
+    // the other layers); the +/- buttons and scroll wheel then zoom in whole steps
+    hiresMap = L.map(el, { zoomSnap: 0, zoomDelta: 1, wheelPxPerZoomLevel: 120 });
+    L.tileLayer(ESRI_IMAGERY + '/tile/{z}/{y}/{x}', {
+      maxZoom: 20, maxNativeZoom: 19, attribution: ESRI_ATTRIB,
+    }).addTo(hiresMap);
+    hiresMap.attributionControl.setPrefix(false);
+    hiresLayer = L.layerGroup().addTo(hiresMap);
+  }
+  const bounds = L.latLngBounds(chipBounds(currentScene));
+  hiresMap.invalidateSize();
+  hiresMap.setMaxBounds(bounds.pad(0.5));
+  hiresMap.setMinZoom(0);
+  hiresMap.fitBounds(bounds, { animate: false, padding: [0, 0] });   // 100%: footprint fills the view
+  hiresMap.setMinZoom(hiresMap.getZoom() - 1);
+  drawHiresOverlays();
+}
+
+function hideHiresMap() {
+  document.getElementById('hires-map').style.display = 'none';
+  canvas.style.display = '';
+}
+
+// Scene footprint and the user's (visible) polygons, as outlines on the basemap
+function drawHiresOverlays() {
+  if (!hiresMap || !currentScene) return;
+  hiresLayer.clearLayers();
+  L.rectangle(chipBounds(currentScene), {
+    color: '#ffffff', weight: 1, dashArray: '4 4', fill: false, interactive: false,
+  }).addTo(hiresLayer);
+  completedPolys.forEach((poly, i) => {
+    if (!polyVisible[i]) return;
+    L.polygon(poly.map(displayToLatLng), {
+      color: POLY_COLORS[i % POLY_COLORS.length], weight: 2, fillOpacity: 0.12, interactive: false,
+    }).addTo(hiresLayer);
+  });
+}
+
 // ── Location map ────────────────────────────────────────────────────────
+const MAP_ZOOM = 5;   // regional view (~1,500 km across the map)
 let locMap    = null;
 let locMarker = null;
 
@@ -1408,7 +1902,7 @@ function updateMap(clat, clon) {
 
   locMarker = L.marker([clat, clon], { icon: starIcon, interactive: false })
     .addTo(locMap);
-  locMap.setView([clat, clon], 1);   // keep the star in view (e.g. Americas)
+  locMap.setView([clat, clon], MAP_ZOOM);   // centred on the scene, so the star is always in view
 }
 
 // ── Instructions screen ─────────────────────────────────────────────────
@@ -1434,7 +1928,8 @@ function closeInstructions() {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 function resetDrawingState() {
-  completedPolys = []; polyVisible = []; currentPoly = []; noPlume = false;
+  completedPolys = []; polyVisible = []; currentPoly = []; polyHistory = []; noPlume = false;
+  if (eraseMode) setEraseMode(false);   // each scene starts in drawing mode
   updatePolyList(); updateNoPlumeBtn();
 }
 
@@ -1459,119 +1954,6 @@ function showDone(msg) {
   document.getElementById('app').style.display  = 'none';
   document.getElementById('done').style.display = 'flex';
   if (msg) document.getElementById('done-msg').textContent = msg;
-}
-
-// ── Colormap range slider ────────────────────────────────────────────────
-// Hard limits per view — slider cannot exceed these bounds
-const VIEW_SLIDER_EXTENTS = {
-  ndvi:   { min:  0.0, max: 1.0 },   // physically bounded [0,1]
-  cloud:  { min:  0.0, max: 1.0 },   // physically bounded [0,1]
-  zscore:                    null,   // adaptive: default ± 1× span
-  dr:                        null,   // adaptive: default ± 1× span
-};
-
-let defaultRanges = {};   // view → {vmin, vmax}  (from server, reset each scene)
-let currentRanges = {};   // view → {vmin, vmax}  (user adjustments, cleared each scene)
-
-const cbControl  = document.getElementById('colorbar-control');
-const cbSliderA  = document.getElementById('cb-slider-a');
-const cbSliderB  = document.getElementById('cb-slider-b');
-const cbVminVal  = document.getElementById('cb-vmin-val');
-const cbVmaxVal  = document.getElementById('cb-vmax-val');
-const cbFill     = document.getElementById('range-track-fill');
-
-function initColorbar(viewRanges) {
-  defaultRanges = viewRanges;
-  currentRanges = {};
-}
-
-function _cbExtent(view, def) {
-  const fixed = VIEW_SLIDER_EXTENTS[view];
-  if (fixed) return { min: fixed.min, max: fixed.max, step: (fixed.max - fixed.min) / 200 };
-  const span = def.vmax - def.vmin;
-  const s    = span > 0 ? span : Math.abs(def.vmin) || 1.0;
-  return { min: def.vmin - 1 * s, max: def.vmax + 1 * s, step: (5 * s) / 200 };
-}
-
-function _fmtCbVal(v) { return v.toFixed(2); }
-
-function updateColorbarForView(view) {
-  if (view === 'rgb') {
-    cbControl.classList.add('cb-disabled');
-    return;
-  }
-  const def = defaultRanges[view];
-  if (!def) { cbControl.classList.add('cb-disabled'); return; }
-
-  const ext = _cbExtent(view, def);
-  cbSliderA.min = cbSliderB.min = ext.min;
-  cbSliderA.max = cbSliderB.max = ext.max;
-  cbSliderA.step = cbSliderB.step = ext.step > 0 ? ext.step : 0.001;
-
-  // Restore user-adjusted values if present, otherwise use defaults
-  const cur = currentRanges[view] || def;
-  cbSliderA.value = cur.vmin;
-  cbSliderB.value = cur.vmax;
-
-  _updateCbDisplay();
-  cbControl.classList.remove('cb-disabled');
-}
-
-function _updateCbDisplay() {
-  const v1   = parseFloat(cbSliderA.value);
-  const v2   = parseFloat(cbSliderB.value);
-  const vmin = Math.min(v1, v2);
-  const vmax = Math.max(v1, v2);
-  cbVminVal.textContent = _fmtCbVal(vmin);
-  cbVmaxVal.textContent = _fmtCbVal(vmax);
-
-  // Highlight the filled track between the two handles
-  const totalRange = parseFloat(cbSliderA.max) - parseFloat(cbSliderA.min);
-  if (totalRange > 0) {
-    const leftPct  = ((vmin - parseFloat(cbSliderA.min)) / totalRange) * 100;
-    const rightPct = ((vmax - parseFloat(cbSliderA.min)) / totalRange) * 100;
-    cbFill.style.left  = leftPct  + '%';
-    cbFill.style.width = (rightPct - leftPct) + '%';
-  }
-}
-
-let cbRerenderTimer;
-function onColorbarChange() {
-  _updateCbDisplay();
-  clearTimeout(cbRerenderTimer);
-  cbRerenderTimer = setTimeout(_applyColorbar, 150);
-}
-
-async function _applyColorbar() {
-  if (!currentScene || activeView === 'rgb') return;
-  const v1   = parseFloat(cbSliderA.value);
-  const v2   = parseFloat(cbSliderB.value);
-  const vmin = Math.min(v1, v2);
-  const vmax = Math.max(v1, v2);
-
-  // Store the user's current adjustment for this view
-  currentRanges[activeView] = { vmin, vmax };
-
-  try {
-    const url = `/api/render?scene_id=${currentScene.scene_id}` +
-                `&view=${encodeURIComponent(activeView)}&vmin=${vmin}&vmax=${vmax}`;
-    const res  = await fetch(url);
-    if (!res.ok) return;
-    const data = await res.json();
-
-    const img = new Image();
-    img.src   = data.image;
-    await new Promise(r => { img.onload = r; img.onerror = r; });
-    imageCache[activeView] = img;
-
-    // Sync thumbnail
-    const thumbImg = document.getElementById(`thumb-${activeView}`);
-    if (thumbImg) thumbImg.src = img.src;
-
-    redraw();
-  } catch (e) {
-    console.error('Colorbar re-render failed:', e);
-  }
 }
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
