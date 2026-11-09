@@ -32,3 +32,13 @@ upload_git_data.csh
 
 # macOS
 .DS_Store
+
+# GEE test pulls and local test databases
+imagery_gee/
+*.tar.gz
+eda_gee_compare/
+eda_calibration/
+imagery_gee_extra*/
+imagery_gee*_compact/
+imagery_mars*/
+mars_targets/
